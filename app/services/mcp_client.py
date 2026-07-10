@@ -7,7 +7,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
@@ -35,6 +35,22 @@ async def _fetch_tools_async() -> list[BaseTool]:
     return await client.get_tools()
 
 
+def _sync_wrap(tool: BaseTool) -> BaseTool:
+    """LangGraph ToolNode invokes tools synchronously; MCP adapters are async-only."""
+    if getattr(tool, "func", None) is not None:
+        return tool
+
+    def _run(**kwargs):
+        return asyncio.run(tool.ainvoke(kwargs))
+
+    return StructuredTool.from_function(
+        func=_run,
+        name=tool.name,
+        description=tool.description or "",
+        args_schema=tool.args_schema,
+    )
+
+
 def _fetch_tools_sync() -> list[BaseTool]:
     try:
         asyncio.get_running_loop()
@@ -50,7 +66,7 @@ def load_mcp_tools() -> tuple[BaseTool, ...]:
     """Return MCP tools as a hashable tuple for agent caching."""
     if not is_mcp_enabled():
         return ()
-    tools = _fetch_tools_sync()
+    tools = [_sync_wrap(t) for t in _fetch_tools_sync()]
     if not tools:
         raise RuntimeError("ENABLE_MCP=true but PostgreSQL MCP returned no tools")
     return tuple(tools)
