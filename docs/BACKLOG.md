@@ -29,6 +29,7 @@ Features and improvements beyond the current V3 scope. Items are grouped by them
 ## Observability & Quality
 
 - **LangSmith advanced evaluation** — Basic tracing is already live (env variables wired in V3). Next steps: build a LangSmith dataset from representative traces (good, bad, edge cases), attach online evaluators (JSON schema adherence, domain grounding), and use experiments to compare prompt/model changes side-by-side before deploying.
+- **Improve markdown export check** — Strengthen validation/checks for the exported idea markdown (e.g. required sections present, non-empty critical fields, or pre-export validation of `idea` + `extended_plan`). Today export has no structure or completeness checks; low priority for backlog.
 
 ---
 

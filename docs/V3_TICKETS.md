@@ -15,10 +15,10 @@
 | DEVSTROM-V3-3   | Alembic setup + all 5 table migrations           | [x]  | V3-2           |
 | DEVSTROM-V3-4   | Run service + FastAPI history endpoints          | [x]  | V3-3           |
 | DEVSTROM-V3-5   | Streamlit History page                           | [x]  | V3-4           |
-| DEVSTROM-V3-6   | Setup MCP Postgres server (standalone)           | [ ]  | V3-3           |
-| DEVSTROM-V3-7   | Integrate MCP into DeepAgent                     | [ ]  | V3-6, V3-4     |
+| DEVSTROM-V3-6   | Setup MCP Postgres server (standalone)           | [x]  | V3-3           |
+| DEVSTROM-V3-7   | Integrate MCP into DeepAgent                     | [x]  | V3-6, V3-4     |
 
-**V3 Progress: 5/7 complete**
+**V3 Progress: 7/7 complete**
 
 ---
 
@@ -215,7 +215,7 @@ The history page is the display layer for the data built in V3-4. It fetches pas
 
 ## DEVSTROM-V3-6 — Setup MCP Postgres Server (Standalone)
 
-- [ ] **Ticket completed**
+- [x] **Ticket completed**
 
 **Type:** Infrastructure
 **Priority:** Medium
@@ -255,7 +255,7 @@ This ticket is purely infrastructure: install the MCP server, configure it, veri
 
 ## DEVSTROM-V3-7 — Integrate MCP into DeepAgent
 
-- [ ] **Ticket completed**
+- [x] **Ticket completed**
 
 **Type:** Feature
 **Priority:** Medium
