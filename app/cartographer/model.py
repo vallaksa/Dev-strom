@@ -1,0 +1,111 @@
+"""Shared data contract for Project Cartographer (F1).
+
+These pydantic models are THE contract between this agent (ingest + parse ->
+ProjectGraph) and the companion F1 agent building the LLM analyzer + API/UI
+(ProjectGraph -> ArchitectureReport). Both sides import from this module -
+do not duplicate or fork these definitions elsewhere.
+
+Field shapes are deliberately permissive (lots of `dict` / `list[dict]`)
+because the two producers (deterministic parser vs. LLM) fill them
+differently; validation of *content* (e.g. mermaid syntax) is left to
+whichever side produces it.
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+# ── Node ─────────────────────────────────────────────────────────────────────
+
+NodeType = Literal[
+    "repo",
+    "package",
+    "module",
+    "file",
+    "class",
+    "function",
+    "external_dep",
+    "service",
+    "entrypoint",
+]
+
+
+class Node(BaseModel):
+    """One vertex in the ProjectGraph.
+
+    `id` must be stable and globally unique within a graph, e.g.
+    "module:app/graph.py", "class:app/graph.py:MyClass", or
+    "ext:langgraph" for an external dependency. Callers should be able to
+    recompute the same id for the same logical entity across re-parses.
+    """
+
+    id: str
+    type: NodeType
+    label: str
+    path: str | None = None
+    language: str | None = None
+    summary: str | None = None
+    meta: dict = Field(default_factory=dict)
+
+
+# ── Edge ─────────────────────────────────────────────────────────────────────
+
+EdgeType = Literal[
+    "contains",
+    "imports",
+    "calls",
+    "depends_on",
+    "exposes",
+    "reads_writes",
+]
+
+
+class Edge(BaseModel):
+    """One directed relationship between two Node ids."""
+
+    source: str
+    target: str
+    type: EdgeType
+    meta: dict = Field(default_factory=dict)
+
+
+# ── ProjectGraph ─────────────────────────────────────────────────────────────
+
+
+class ProjectGraph(BaseModel):
+    """The normalized structural graph produced by parse.build_project_graph.
+
+    This is the deterministic, parser-derived half of the contract. The
+    other agent's ArchitectureReport is derived FROM a ProjectGraph (usually
+    via an LLM) but is stored/returned separately - see ArchitectureReport.
+    """
+
+    repo_url: str | None = None
+    root_path: str
+    languages: list[str] = Field(default_factory=list)
+    nodes: list[Node] = Field(default_factory=list)
+    edges: list[Edge] = Field(default_factory=list)
+    entrypoints: list[str] = Field(default_factory=list)
+    manifests: dict = Field(default_factory=dict)
+    stats: dict = Field(default_factory=dict)
+
+
+# ── ArchitectureReport ───────────────────────────────────────────────────────
+
+
+class ArchitectureReport(BaseModel):
+    """LLM-authored architectural summary of a ProjectGraph.
+
+    Defined here (rather than in the other agent's package) purely so both
+    sides of F1 can import a single shared contract. This agent does not
+    populate it - the LLM-analyzer agent is responsible for producing
+    instances of this model from a ProjectGraph.
+    """
+
+    summary: str
+    components: list[dict] = Field(default_factory=list)  # {name, responsibility, node_ids: list[str]}
+    layers: list[str] = Field(default_factory=list)
+    data_flow: str = ""
+    external_integrations: list[str] = Field(default_factory=list)
+    mermaid: str = ""
+    risks: list[str] = Field(default_factory=list)

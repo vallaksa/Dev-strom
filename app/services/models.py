@@ -105,3 +105,30 @@ class ExpandedIdea(Base):
     )
 
     run: Mapped["Run"] = relationship(back_populates="expanded_ideas")
+
+
+# ── cartograph_runs (F1: Project Cartographer) ──────────────────────────────────
+class CartographRun(Base):
+    """One row per Project Cartographer run: the parsed ProjectGraph and,
+    once the LLM-analyzer agent has run, the derived ArchitectureReport.
+
+    Both JSONB payloads are stored as plain dicts (pydantic `.model_dump()`
+    output from app.cartographer.model.ProjectGraph / ArchitectureReport) -
+    this ORM layer intentionally does not import those pydantic models, to
+    keep the persistence layer decoupled from the contract's shape.
+    """
+
+    __tablename__ = "cartograph_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    repo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    root_path: Mapped[str] = mapped_column(Text, nullable=False)
+    project_graph: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    architecture_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+    )
