@@ -4,23 +4,15 @@ All LLM (LangGraph), Tavily web-search, and DB (run_service) layers are
 monkeypatched. No test in this module makes a real network or database
 call.
 
-Some assertions target behavior described for a concurrent backend-
-hardening branch rather than the current implementation in this worktree:
-  - /ideas must not 500 on an idea-count mismatch (it should gracefully
-    truncate over-generation or keep under-generation).
-  - /export should read a persisted expansion via
-    run_service.get_latest_expansion(run_id, pid), only calling
-    graph_expand_idea() on-demand when no persisted expansion exists.
-  - GET /health and GET /ready should exist.
-Those tests detect whether the target behavior/endpoint is present yet and
-`pytest.skip(...)` with a clear reason if not, so the suite stays green
-against today's code and starts asserting for real once that branch lands.
+A couple of tests still carry a defensive `pytest.skip(...)` guard for
+idea-count-mismatch handling on /ideas, in case that behavior ever
+regresses to a 500; today's merged backend satisfies it, so they run for
+real rather than skipping.
 """
 
 import pytest
 
 from app import api as api_module
-from app.services import run_service
 from tests.conftest import FakeGraphApp, make_idea
 
 # ── /ideas ────────────────────────────────────────────────────────────────
@@ -46,13 +38,16 @@ def test_ideas_happy_path_returns_run_id_and_n_ideas(client, monkeypatch):
 
 
 def test_ideas_missing_openai_key_returns_503(client, monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # The 503 guard reads app.config.settings (a cached pydantic-settings
+    # singleton), not os.environ directly, so patch the settings field
+    # itself rather than the environment.
+    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
     resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
     assert resp.status_code == 503
 
 
 def test_ideas_missing_tavily_key_returns_503(client, monkeypatch):
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr(api_module.settings, "tavily_api_key", None)
     resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
     assert resp.status_code == 503
 
@@ -123,7 +118,9 @@ def test_expand_happy_path(client, monkeypatch, sample_run):
 
 
 def test_expand_missing_openai_key_returns_503(client, monkeypatch, sample_run):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # As above: patch the settings singleton so the 503 guard actually
+    # triggers, before the endpoint ever reaches get_run()/the database.
+    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
     resp = client.post("/expand", json={"run_id": sample_run["run_id"], "pid": 1})
     assert resp.status_code == 503
 
@@ -144,11 +141,14 @@ def test_expand_invalid_pid_returns_400(client, monkeypatch, sample_run):
 
 
 def test_export_current_behavior_returns_markdown_with_attachment_header(client, monkeypatch, sample_run):
-    """Exercises /export against today's implementation (it re-expands on
-    every call). Verifies the markdown body and Content-Disposition header
-    regardless of which branch lands the persisted-expansion optimization.
+    """Exercises /export's on-demand expansion path: no persisted expansion
+    exists yet for this (run_id, pid), so it must call graph_expand_idea()
+    and then persist the result. Verifies the markdown body and
+    Content-Disposition header.
     """
     monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_latest_expansion", lambda *, run_id, pid: None)
+    monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: "expanded-1")
     monkeypatch.setattr(
         api_module,
         "graph_expand_idea",
@@ -167,17 +167,10 @@ def test_export_current_behavior_returns_markdown_with_attachment_header(client,
 
 
 def test_export_target_uses_persisted_expansion(client, monkeypatch, sample_run):
-    """Target behavior: /export reads the persisted expansion via
-    run_service.get_latest_expansion(run_id, pid) and only calls
-    graph_expand_idea() on-demand when none exists. Skipped until that
-    function is added by the backend-hardening branch.
+    """/export reads the persisted expansion via run_service.get_latest_expansion
+    (imported into app.api's module namespace as `get_latest_expansion`) and
+    only calls graph_expand_idea() on-demand when none exists.
     """
-    if not hasattr(run_service, "get_latest_expansion"):
-        pytest.skip(
-            "run_service.get_latest_expansion is not implemented yet in this "
-            "worktree - pending the backend-hardening branch's /export persistence work."
-        )
-
     expand_calls = {"count": 0}
 
     def fake_expand(idea):
@@ -186,10 +179,16 @@ def test_export_target_uses_persisted_expansion(client, monkeypatch, sample_run)
 
     monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
     monkeypatch.setattr(api_module, "graph_expand_idea", fake_expand)
+    # app/api.py does `from app.services.run_service import get_latest_expansion`,
+    # so the name it calls lives in api_module's namespace, not run_service's -
+    # patching run_service.get_latest_expansion would not affect api.py's
+    # already-bound reference. It also returns a dict with "extended_plan"
+    # (matching run_service.get_latest_expansion's real return shape), which
+    # is what post_export indexes into.
     monkeypatch.setattr(
-        run_service,
+        api_module,
         "get_latest_expansion",
-        lambda run_id, pid: ["Persisted step 1", "Persisted step 2"],
+        lambda *, run_id, pid: {"extended_plan": ["Persisted step 1", "Persisted step 2"]},
     )
 
     resp = client.post("/export", json={"run_id": sample_run["run_id"], "pid": 1})
@@ -242,21 +241,15 @@ def test_run_detail_not_found_returns_404(client, monkeypatch):
 
 def test_health_endpoint(client):
     resp = client.get("/health")
-    if resp.status_code == 404:
-        pytest.skip(
-            "GET /health is not implemented yet in this worktree - pending the "
-            "backend-hardening branch's app/config.py + health-check work."
-        )
     assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
 
 
-def test_ready_endpoint(client):
+def test_ready_endpoint(client, monkeypatch):
+    # Mock db.ping (the module api.py actually calls) so this stays
+    # hermetic - otherwise /ready would attempt a real connection to
+    # DATABASE_URL.
+    monkeypatch.setattr(api_module.db, "ping", lambda: "PostgreSQL 16.0 test")
     resp = client.get("/ready")
-    if resp.status_code == 404:
-        pytest.skip(
-            "GET /ready is not implemented yet in this worktree - pending the "
-            "backend-hardening branch's app/config.py + health-check work."
-        )
-    # /ready may legitimately report 503 if a dependency (e.g. DB) is down,
-    # so accept either as evidence the endpoint exists and responds.
-    assert resp.status_code in (200, 503)
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok", "database": "reachable"}
