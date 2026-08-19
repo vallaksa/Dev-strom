@@ -99,3 +99,30 @@ def get_cartograph_run(run_id: str) -> dict:
     """Call GET /cartograph/{run_id} and return {run_id, project_graph, architecture_report}."""
     return _get(f"/cartograph/{run_id}")
 
+
+# ── Improvement / Feature Advisor (F2) ───────────────────────────────────────
+
+
+def post_advise(
+    *, repo_url: str | None = None, path: str | None = None, run_id: str | None = None
+) -> dict:
+    """Call POST /advise and return {run_id, advisor_report}.
+
+    Provide exactly one of repo_url, path, or run_id. Uses a long timeout
+    since (when not given run_id) the clone/parse/analyze/advise pipeline
+    runs synchronously on the server.
+    """
+    payload: dict = {}
+    if repo_url and repo_url.strip():
+        payload["repo_url"] = repo_url.strip()
+    if path and path.strip():
+        payload["path"] = path.strip()
+    if run_id and run_id.strip():
+        payload["run_id"] = run_id.strip()
+    return _post("/advise", payload, timeout=300)
+
+
+def get_advise_run(run_id: str) -> dict:
+    """Call GET /advise/{run_id} and return the persisted advisor run record."""
+    return _get(f"/advise/{run_id}")
+
