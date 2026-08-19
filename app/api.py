@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
-from app.models.dto import ExpandRequest, ExportRequest, IdeasRequest
+from app.models.dto import CartographRequest, ExpandRequest, ExportRequest, IdeasRequest
 
 load_dotenv()
 
@@ -26,6 +26,23 @@ from app.services.run_service import (
     save_expanded_idea,
     save_run,
 )
+
+# ── Project Cartographer (F1) ────────────────────────────────────────────────
+# app.cartographer.{analyze,pipeline,store} are owned by a parallel branch
+# (feat/f1-core) and may not exist yet in this worktree. Import them lazily
+# and guard with try/except so app.api stays importable (and every existing
+# route/test above keeps working) whether or not feat/f1-core has landed. The
+# /cartograph routes below check for None and return a clear 503 instead.
+try:
+    from app.cartographer.analyze import analyze_architecture
+    from app.cartographer.pipeline import cartograph
+    from app.cartographer.store import get as get_cartograph_run
+    from app.cartographer.store import save as save_cartograph_run
+except ImportError:
+    analyze_architecture = None
+    cartograph = None
+    get_cartograph_run = None
+    save_cartograph_run = None
 
 # ── logging ───────────────────────────────────────────────────────────────────
 # Configure the root logger once, at app startup, with the level from typed
@@ -217,6 +234,78 @@ def get_run_detail(run_id: str):
             detail=f"Run {run_id} not found.",
         )
     return run
+
+
+# ── Project Cartographer (F1) ────────────────────────────────────────────────
+
+def _to_dict(obj) -> dict:
+    """Normalize a ProjectGraph/ArchitectureReport (real pydantic model, or a
+    dict/mock in tests) into a plain, JSON-serializable dict."""
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump(mode="json")
+    return dict(obj)
+
+
+@api.post("/cartograph")
+def post_cartograph(body: CartographRequest):
+    """Map a repository's architecture: build a ProjectGraph, analyze it into
+    an ArchitectureReport, persist both, and return them. Synchronous MVP —
+    the clone/parse/analyze pipeline runs inline on the request.
+    """
+    if not settings.openai_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Set OPENAI_API_KEY in .env",
+        )
+    if cartograph is None or analyze_architecture is None or save_cartograph_run is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Cartographer core modules (app.cartographer.pipeline/analyze/store) "
+                "are not available yet."
+            ),
+        )
+
+    target = body.repo_url or body.path
+    try:
+        project_graph = cartograph(target, repo_url=body.repo_url)
+        architecture_report = analyze_architecture(project_graph)
+    except Exception as exc:
+        logger.exception("Cartograph pipeline failed for %r", target)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cartograph failed: {exc}",
+        ) from exc
+
+    run_id = save_cartograph_run(project_graph, architecture_report)
+
+    return {
+        "run_id": run_id,
+        "project_graph": _to_dict(project_graph),
+        "architecture_report": _to_dict(architecture_report),
+    }
+
+
+@api.get("/cartograph/{run_id}")
+def get_cartograph_run_detail(run_id: str):
+    """Return a previously persisted cartograph run: {run_id, project_graph,
+    architecture_report}. 404 if it does not exist.
+    """
+    if get_cartograph_run is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Cartographer core modules (app.cartographer.store) are not available yet.",
+        )
+
+    record = get_cartograph_run(run_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Cartograph run {run_id} not found.",
+        )
+    return record
 
 
 # ── Health / Readiness ───────────────────────────────────────────────────────
