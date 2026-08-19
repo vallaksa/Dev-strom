@@ -52,3 +52,31 @@ class CartographResponse(BaseModel):
     run_id: str
     project_graph: dict
     architecture_report: dict
+
+
+# ── Improvement / Feature Advisor (F2) ───────────────────────────────────────
+# advisor_report below is typed as plain `dict` for the same reason
+# CartographResponse's fields are: the API layer dumps the real
+# `app.advisor.model.AdvisorReport` pydantic model to dict before returning,
+# so this DTO stays decoupled from that contract module's exact shape.
+
+class AdviseRequest(BaseModel):
+    repo_url: str | None = Field(default=None, description="Git URL of the repo to map and advise on")
+    path: str | None = Field(default=None, description="Local filesystem path to the repo to map and advise on")
+    run_id: str | None = Field(default=None, description="An existing cartograph run ID to advise against")
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self) -> "AdviseRequest":
+        provided = [
+            bool(self.repo_url and self.repo_url.strip()),
+            bool(self.path and self.path.strip()),
+            bool(self.run_id and self.run_id.strip()),
+        ]
+        if sum(provided) != 1:
+            raise ValueError("Provide exactly one of 'repo_url', 'path', or 'run_id'.")
+        return self
+
+
+class AdviseResponse(BaseModel):
+    run_id: str
+    advisor_report: dict

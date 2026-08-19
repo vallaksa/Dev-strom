@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
-from app.models.dto import CartographRequest, ExpandRequest, ExportRequest, IdeasRequest
+from app.models.dto import AdviseRequest, CartographRequest, ExpandRequest, ExportRequest, IdeasRequest
 
 load_dotenv()
 
@@ -45,6 +45,23 @@ except ImportError as exc:
     cartograph = None
     get_cartograph_run = None
     save_cartograph_run = None
+
+# ── Improvement / Feature Advisor (F2) ───────────────────────────────────────
+# Same guarding rationale as the Cartographer import above: keep app.api
+# importable (and its routes 503-able) even if app.advisor fails to import
+# for some reason, and let tests monkeypatch these names directly.
+try:
+    from app.advisor.pipeline import advise_repo_with_context
+    from app.advisor.store import PostgresJsonbStore as AdvisorPostgresJsonbStore
+
+    _advisor_store = AdvisorPostgresJsonbStore()
+    save_advisor_run = _advisor_store.save
+    get_advisor_run = _advisor_store.get
+except ImportError as exc:
+    logging.getLogger(__name__).error("Advisor modules failed to import: %s", exc)
+    advise_repo_with_context = None
+    get_advisor_run = None
+    save_advisor_run = None
 
 # ── logging ───────────────────────────────────────────────────────────────────
 # Configure the root logger once, at app startup, with the level from typed
@@ -306,6 +323,76 @@ def get_cartograph_run_detail(run_id: str):
         raise HTTPException(
             status_code=404,
             detail=f"Cartograph run {run_id} not found.",
+        )
+    return record
+
+
+# ── Improvement / Feature Advisor (F2) ───────────────────────────────────────
+
+@api.post("/advise")
+def post_advise(body: AdviseRequest):
+    """Produce a prioritized improvement roadmap for a repository, grounded in
+    its actual code graph: either map+analyze it fresh (repo_url/path) or
+    advise against an existing cartograph run (run_id). Persists and returns
+    the resulting AdvisorReport. Synchronous MVP, same as POST /cartograph.
+    """
+    if not settings.openai_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Set OPENAI_API_KEY in .env",
+        )
+    if advise_repo_with_context is None or save_advisor_run is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Advisor core modules (app.advisor.pipeline/advise/store) "
+                "are not available yet."
+            ),
+        )
+
+    try:
+        result = advise_repo_with_context(
+            url_or_path=body.repo_url or body.path,
+            run_id=body.run_id,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Advisor pipeline failed for repo_url=%r path=%r run_id=%r",
+            body.repo_url, body.path, body.run_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Advisor pipeline failed: {exc}",
+        ) from exc
+
+    run_id = save_advisor_run(
+        result["advisor_report"],
+        cartograph_run_id=result["cartograph_run_id"],
+        repo_url=result["repo_url"],
+    )
+
+    return {
+        "run_id": run_id,
+        "advisor_report": _to_dict(result["advisor_report"]),
+    }
+
+
+@api.get("/advise/{run_id}")
+def get_advise_run_detail(run_id: str):
+    """Return a previously persisted advisor run: {run_id, cartograph_run_id,
+    repo_url, advisor_report, created_at}. 404 if it does not exist.
+    """
+    if get_advisor_run is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Advisor core modules (app.advisor.store) are not available yet.",
+        )
+
+    record = get_advisor_run(run_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Advisor run {run_id} not found.",
         )
     return record
 

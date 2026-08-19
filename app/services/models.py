@@ -132,3 +132,38 @@ class CartographRun(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"),
     )
+
+
+# ── advisor_runs (F2: Improvement / Feature Advisor) ────────────────────────────
+class AdvisorRun(Base):
+    """One row per Improvement / Feature Advisor run: the prioritized
+    AdvisorReport produced from a ProjectGraph (+ optional
+    ArchitectureReport), plus provenance back to the cartograph run it was
+    derived from (when it was loaded from one) and/or the repo it targeted.
+
+    `cartograph_run_id` is a loose reference (no FK constraint) rather than
+    a `ForeignKey("cartograph_runs.id")` on purpose: an advisor run can be
+    produced from a fresh (unpersisted) cartograph pipeline run, in which
+    case there is no cartograph_runs row to point at, so this column must
+    stay nullable and unconstrained.
+
+    `advisor_report` is stored as a plain dict (pydantic `.model_dump()`
+    output from app.advisor.model.AdvisorReport) - this ORM layer
+    intentionally does not import that pydantic model, to keep the
+    persistence layer decoupled from the contract's shape (same pattern as
+    CartographRun above).
+    """
+
+    __tablename__ = "advisor_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    cartograph_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    repo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    advisor_report: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+    )
