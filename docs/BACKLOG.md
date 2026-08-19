@@ -17,8 +17,9 @@ Features and improvements beyond the current V3 scope. Items are grouped by them
 
 ---
 
-## Knowledge & RAG (V4 — Neo4j GraphRAG)
+## Knowledge & RAG
 
+- **Global knowledge base (pgvector)** — Redesign of the per-user RAG approach dropped from V3. Instead of scoping embedded web chunks per user (low hit rate — users rarely repeat the same tech stack), build a **global shared knowledge store**. All users' web search results are chunked, embedded, and stored in `web_chunks` without user scoping. Any search for "React" benefits from every past "React" search by any user. Implementation: async background embedding via `BackgroundTask` (zero user-facing latency), global retrieval at `generate_ideas` time via cosine similarity. Gated behind `ENABLE_RAG` env var.
 - **Neo4j GraphRAG integration** — Replace the pgvector-based `web_chunks` table with a full Neo4j Knowledge Graph. Instead of storing raw text chunks with embeddings, use an LLM extraction step to pull entities (frameworks, features, patterns) and relationships from web search results, then store them as Nodes and Edges in Neo4j. Neo4j's native vector index replaces pgvector for similarity search, while graph traversal adds structural reasoning (e.g. "Next.js INTRODUCED Server Actions, which RUNS_ON Node.js"). This eliminates hallucinations by grounding the LLM in verified, connected data structures.
 - **Pre-seeded RAG knowledge** — Run an offline script (weekly or on-demand) that uses the LLM to map out common tech stacks (React, Spring Boot, Django, etc.) into a permanent Neo4j graph. When a user asks for a known stack, the agent retrieves pre-built graph context instantly (zero Tavily latency). For novel/unknown stacks, Tavily fires dynamically, extracts entities, and permanently adds them to the graph — the system learns over time.
 - **Manual knowledge base refresh** — Add a settings page action that triggers a batch update: executes a curated set of queries against Tavily, extracts entities via LLM, and refreshes the Neo4j graph with the latest data. Ensures the knowledge base stays current without waiting for user-triggered runs.
@@ -28,6 +29,7 @@ Features and improvements beyond the current V3 scope. Items are grouped by them
 ## Observability & Quality
 
 - **LangSmith advanced evaluation** — Basic tracing is already live (env variables wired in V3). Next steps: build a LangSmith dataset from representative traces (good, bad, edge cases), attach online evaluators (JSON schema adherence, domain grounding), and use experiments to compare prompt/model changes side-by-side before deploying.
+- **Improve markdown export check** — Strengthen validation/checks for the exported idea markdown (e.g. required sections present, non-empty critical fields, or pre-export validation of `idea` + `extended_plan`). Today export has no structure or completeness checks; low priority for backlog.
 
 ---
 
@@ -68,14 +70,14 @@ Items explicitly descoped from V3 with documented rationale.
 
 | Item | Deferred reason |
 |---|---|
-| Neo4j GraphRAG | V3 ships with pgvector for standard vector RAG; Neo4j rewrite is the flagship V4 feature |
+| Per-user RAG (pgvector) | Dropped from V3 — low hit rate (users rarely repeat same tech stack). Redesigned as global knowledge base in backlog |
+| Neo4j GraphRAG | V3 ships MCP dedup instead; Neo4j rewrite is the flagship V4 feature |
 | Pre-seeded RAG knowledge | Requires Neo4j infrastructure; deferred until GraphRAG is in place |
 | Google OAuth + JWT auth | Overhead for current stage; all features use anonymous user until auth is implemented |
 | React frontend | Streamlit is sufficient for V3; React rewrite after backend features are complete |
 | Email + password login | Google OAuth only — password management (bcrypt, reset flow, email verification) adds complexity with no learning benefit |
 | Redis caching layer | `cachetools.TTLCache` in-process is sufficient for V3; Redis needed for multi-process / distributed deployment |
 | Multiple expansions history UI | Backend allows multiple expansions (no UNIQUE constraint); surfacing past expansions in the UI is a V4 UX feature |
-| Cross-user web chunk reuse | V3 scopes `web_chunks` by `run_id`; cross-user retrieval requires semantic deduplication and raises privacy questions |
 
 ---
 

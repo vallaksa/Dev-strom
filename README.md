@@ -227,10 +227,6 @@ mypy app            # type check (advisory - non-blocking in CI)
 
 All tests are hermetic: the LLM (OpenAI), Tavily web search, and PostgreSQL layers are monkeypatched in
 `tests/`, so the suite makes no real network or database calls and needs no API keys or running database.
-A handful of integration tests assert target behavior for work landing on a concurrent backend-hardening
-branch (e.g. graceful handling of idea-count mismatches, `GET /health`/`GET /ready`); those are
-`pytest.skip(...)`-guarded with a clear reason until that branch's code is present, so the suite stays
-green either way.
 
 CI (`.github/workflows/ci.yml`) runs `ruff check`, `mypy` (non-blocking), `pytest` with coverage, and
 `pip-audit` on every push/PR - no secrets required.
@@ -248,6 +244,24 @@ This starts `db` (Postgres with pgvector), a one-shot `migrate` service that run
 before anything else starts, `api` (FastAPI on `:8000`), and `ui` (Streamlit on `:8501`, wired to talk to
 `api` over the compose network via `API_BASE_URL=http://api:8000`). Validate the compose file without a
 running daemon via `docker compose config`.
+
+## PostgreSQL MCP (V3-6 / V3-7)
+
+Dev-Strom uses the standalone [postgresql-mcp](https://github.com/vallaksa/postgresql-mcp) server (Docker, Streamable HTTP) so the idea agent can query past `runs` and avoid duplicate ideas.
+
+**Prerequisites:** `postgresql-mcp` running (e.g. `curl http://127.0.0.1:3000/health`).
+
+Add to `.env`:
+
+```
+MCP_HTTP_URL=http://127.0.0.1:3000/mcp
+MCP_API_KEY=<same key as postgresql-mcp Docker>
+ENABLE_MCP=true
+```
+
+With `ENABLE_MCP=false`, idea generation behaves as before (no MCP tools).
+
+---
 
 ## License and docs
 
