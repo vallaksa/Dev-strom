@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from functools import lru_cache
 from typing import TypedDict
@@ -7,12 +8,18 @@ from deepagents import create_deep_agent
 from langchain.agents.middleware import wrap_model_call
 from langgraph.graph import END, START, StateGraph
 
+from app.config import settings
 from app.models.domain import ProjectIdea
 from app.tools import web_search_project_ideas
 
+logger = logging.getLogger(__name__)
 
-# ── Model constant ────────────────────────────────────────────────────────
-MODEL = "gpt-5-mini"
+# ── Model selection ──────────────────────────────────────────────────────────
+# Primary model + an ordered fallback chain, both sourced from typed config
+# (app.config.settings, itself backed by env/.env). MODEL is kept as a plain
+# alias for readability elsewhere in this module.
+MODEL = settings.model
+MODEL_FALLBACKS = settings.model_fallbacks
 
 # ── state ─────────────────────────────────────────────────────────────────────
 
@@ -58,21 +65,21 @@ def _extract_last_content(result: dict) -> str:
     return last.content if hasattr(last, "content") else str(last)
 
 
-# ── agent singletons (created once, reused) ───────────────────────────────────
+# ── agent singletons (created once per model, reused) ─────────────────────────
 
 @wrap_model_call
 def _log_model_call(request, handler):
-    print("[DevStrom middleware] model call (generate_ideas agent)")
-    print(_get_idea_agent.cache_info()) 
-    print(_get_expand_agent.cache_info()) 
+    logger.debug("model call (generate_ideas agent)")
+    logger.debug("idea agent cache: %s", _get_idea_agent.cache_info())
+    logger.debug("expand agent cache: %s", _get_expand_agent.cache_info())
     return handler(request)
 
 
 @lru_cache(maxsize=None)
-def _get_idea_agent():
+def _get_idea_agent(model: str = MODEL):
     return create_deep_agent(
         name="idea_generator",
-        model=MODEL,
+        model=model,
         tools=[],
         system_prompt=_IDEAS_SYSTEM,
         middleware=[_log_model_call],
@@ -80,13 +87,38 @@ def _get_idea_agent():
 
 
 @lru_cache(maxsize=None)
-def _get_expand_agent():
+def _get_expand_agent(model: str = MODEL):
     return create_deep_agent(
         name="expand_idea",
-        model=MODEL,
+        model=model,
         tools=[],
         system_prompt=_EXPAND_SYSTEM,
     )
+
+
+# ── model fallback chain ────────────────────────────────────────────────────────
+
+def _invoke_with_fallback(get_agent, messages: list[dict]) -> dict:
+    """Invoke `get_agent(model).invoke(...)`, trying MODEL first and falling
+    back through MODEL_FALLBACKS (in order) if a call raises. Logs each
+    failure and the fallback that is attempted next. Re-raises the final
+    error if every model in the chain fails.
+    """
+    models_to_try = [MODEL, *MODEL_FALLBACKS]
+    last_error: Exception | None = None
+    for i, model in enumerate(models_to_try):
+        try:
+            return get_agent(model).invoke({"messages": messages})
+        except Exception as exc:  # noqa: BLE001 - deliberately broad: any provider error triggers fallback
+            last_error = exc
+            remaining = models_to_try[i + 1:]
+            if remaining:
+                logger.warning(
+                    "Model %r failed (%s); falling back to %r", model, exc, remaining[0]
+                )
+            else:
+                logger.error("Model %r failed and no fallbacks remain: %s", model, exc)
+    raise last_error
 
 
 # ── system prompts ────────────────────────────────────────────────────────────
@@ -203,9 +235,9 @@ def generate_ideas(state: DevStromState) -> dict:
         parts.append(f"Level (bias ideas toward): {level}")
     parts.append(f"\nWeb context:\n{web_context[:4000]}\n\nOutput exactly {count} ideas as JSON:\n")
 
-    result = _get_idea_agent().invoke({
-        "messages": [{"role": "user", "content": "\n".join(parts)}],
-    })
+    result = _invoke_with_fallback(
+        _get_idea_agent, [{"role": "user", "content": "\n".join(parts)}]
+    )
 
     ideas = _parse_ideas(_extract_last_content(result), count)
     if not ideas:
@@ -224,9 +256,9 @@ def expand_idea(idea: dict) -> dict:
         if k in idea
     }
     user_content = f"Expand this project idea:\n{json.dumps(trimmed)}"
-    result = _get_expand_agent().invoke({
-        "messages": [{"role": "user", "content": user_content}],
-    })
+    result = _invoke_with_fallback(
+        _get_expand_agent, [{"role": "user", "content": user_content}]
+    )
 
     content = _strip_markdown_fences(_extract_last_content(result))
     try:

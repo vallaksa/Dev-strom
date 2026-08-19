@@ -85,6 +85,32 @@ def save_expanded_idea(
     return expanded_id
 
 
+def get_latest_expansion(*, run_id: str, pid: int) -> dict | None:
+    """Fetch the most recently persisted expansion for (run_id, pid).
+
+    Used by POST /export so it can reuse the extended_plan already written by
+    a prior POST /expand call instead of calling the LLM again. Returns None
+    if the idea at this (run_id, pid) has never been expanded.
+    """
+    with get_session() as session:
+        stmt = (
+            select(ExpandedIdea)
+            .where(ExpandedIdea.run_id == uuid.UUID(run_id), ExpandedIdea.pid == pid)
+            .order_by(ExpandedIdea.created_at.desc())
+            .limit(1)
+        )
+        expanded = session.execute(stmt).scalars().first()
+        if expanded is None:
+            return None
+        return {
+            "id": str(expanded.id),
+            "run_id": str(expanded.run_id),
+            "pid": expanded.pid,
+            "extended_plan": expanded.extended_plan,
+            "created_at": expanded.created_at.isoformat(),
+        }
+
+
 def load_history(
     *,
     user_id: uuid.UUID = ANONYMOUS_USER_ID,

@@ -5,7 +5,7 @@ All runs are persisted to PostgreSQL. Until auth is implemented, all
 operations use the ANONYMOUS_USER_ID.
 """
 
-import os
+import logging
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -15,9 +15,27 @@ from app.models.dto import ExpandRequest, ExportRequest, IdeasRequest
 
 load_dotenv()
 
+from app.config import settings
 from app.graph import app as graph_app, expand_idea as graph_expand_idea
+from app.services import db
 from app.services.export_formatter import idea_to_markdown
-from app.services.run_service import get_run, load_history, save_expanded_idea, save_run
+from app.services.run_service import (
+    get_latest_expansion,
+    get_run,
+    load_history,
+    save_expanded_idea,
+    save_run,
+)
+
+# ── logging ───────────────────────────────────────────────────────────────────
+# Configure the root logger once, at app startup, with the level from typed
+# config (LOG_LEVEL env var, default INFO). All module-level loggers across
+# the app (e.g. app.graph's) inherit this configuration.
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 api = FastAPI(title="Dev-Strom")
 
@@ -27,7 +45,7 @@ api = FastAPI(title="Dev-Strom")
 @api.post("/ideas")
 def post_ideas(body: IdeasRequest):
     """Generate project ideas and persist the run to the database."""
-    if not os.getenv("OPENAI_API_KEY") or not os.getenv("TAVILY_API_KEY"):
+    if not settings.openai_api_key or not settings.tavily_api_key:
         raise HTTPException(
             status_code=503,
             detail="Set OPENAI_API_KEY and TAVILY_API_KEY in .env",
@@ -43,10 +61,21 @@ def post_ideas(body: IdeasRequest):
 
     result = graph_app.invoke(inputs)
     ideas = result.get("ideas", [])
-    if len(ideas) != body.count:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Expected {body.count} ideas from graph, got {len(ideas)}",
+
+    # The graph already pads short results with empty ideas (see
+    # app.graph.generate_ideas), so a count mismatch here is benign: the
+    # model occasionally over- or under-generates. Never 500 for this —
+    # truncate if we got too many, and keep whatever we got if we got too
+    # few (the caller can retry expand/export against fewer pids).
+    if len(ideas) > body.count:
+        logger.warning(
+            "Model returned %d ideas, requested %d; truncating.", len(ideas), body.count
+        )
+        ideas = ideas[: body.count]
+    elif len(ideas) < body.count:
+        logger.warning(
+            "Model returned %d ideas, requested %d; keeping what came back.",
+            len(ideas), body.count,
         )
 
     # Attach 1-based position IDs
@@ -77,7 +106,7 @@ def post_ideas(body: IdeasRequest):
 @api.post("/expand")
 def post_expand(body: ExpandRequest):
     """Expand a single idea into a deeper implementation plan."""
-    if not os.getenv("OPENAI_API_KEY"):
+    if not settings.openai_api_key:
         raise HTTPException(
             status_code=503,
             detail="Set OPENAI_API_KEY in .env",
@@ -131,14 +160,29 @@ def post_export(body: ExportRequest):
             detail=f"Invalid pid. Use pid 1–{len(ideas)} for this run.",
         )
 
-    # For export, we need to re-expand (or the caller can expand first).
-    # Try to get the idea and its expansion from the graph.
     idea = ideas[body.pid - 1].copy()
     idea.pop("pid", None)
 
-    # Re-expand the idea for export (consistent with original behavior)
-    expanded = graph_expand_idea(idea)
-    extended_plan = expanded.get("extended_plan", [])
+    # Reuse the expansion already persisted by POST /expand for this
+    # (run_id, pid), if one exists — don't call the LLM again. Only expand
+    # on-demand (and persist the result, same as POST /expand) when this
+    # idea has never been expanded, so callers don't have to call
+    # POST /expand first.
+    latest = get_latest_expansion(run_id=body.run_id, pid=body.pid)
+    if latest is not None:
+        extended_plan = latest["extended_plan"]
+    else:
+        logger.info(
+            "No persisted expansion for run_id=%s pid=%s; expanding on demand.",
+            body.run_id, body.pid,
+        )
+        expanded = graph_expand_idea(idea)
+        extended_plan = expanded.get("extended_plan", [])
+        save_expanded_idea(
+            run_id=body.run_id,
+            pid=body.pid,
+            extended_plan=extended_plan,
+        )
 
     md = idea_to_markdown(idea, extended_plan, run.get("tech_stack"))
     name_slug = (idea.get("name") or "idea").replace(" ", "_")[:50]
@@ -173,3 +217,38 @@ def get_run_detail(run_id: str):
             detail=f"Run {run_id} not found.",
         )
     return run
+
+
+# ── Health / Readiness ───────────────────────────────────────────────────────
+
+@api.get("/health")
+def health():
+    """Liveness probe: the process is up and can serve requests.
+
+    Always returns 200 — does not check downstream dependencies (DB, LLM
+    providers). Use /ready for that.
+    """
+    return {"status": "ok"}
+
+
+@api.get("/ready")
+def ready():
+    """Readiness probe: the process is up AND its dependencies are usable.
+
+    Pings the database if DATABASE_URL is configured. If no database is
+    configured, that's a valid (DB-less) deployment, so this reports ok
+    rather than failing.
+    """
+    if not settings.database_url:
+        return {"status": "ok", "database": "not configured"}
+
+    try:
+        db.ping()
+    except Exception as exc:
+        logger.error("Readiness check failed: database unreachable: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database unreachable: {exc}",
+        )
+
+    return {"status": "ok", "database": "reachable"}
