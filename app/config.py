@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     # ── database ───────────────────────────────────────────────────────────
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
+    # ── graph database (F1-4, Neo4jStore) ─────────────────────────────────
+    neo4j_uri: str | None = Field(default=None, alias="NEO4J_URI")
+    neo4j_user: str | None = Field(default=None, alias="NEO4J_USER")
+    neo4j_password: str | None = Field(default=None, alias="NEO4J_PASSWORD")
+
+    # Which CartographStore backend to use: "postgres" (default) or "neo4j".
+    cartograph_store_backend: str = Field(default="postgres", alias="CARTOGRAPH_STORE_BACKEND")
+
     # ── LLM model selection ────────────────────────────────────────────────
     # Primary model used by the idea-generation and expand agents, with an
     # ordered fallback chain tried in order if the primary call fails.
