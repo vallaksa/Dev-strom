@@ -1,0 +1,50 @@
+.carto-graph {
+  display: flex;
+  gap: var(--space-4);
+  height: 640px;
+}
+
+.carto-graph__canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: var(--canvas) !important;
+}
+
+.carto-graph__legend-overlay {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 10;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* Dark-theme the built-in React Flow chrome to match the canvas panel. */
+.react-flow__controls {
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: var(--hairline) solid var(--canvas-border);
+}
+
+.react-flow__controls-button {
+  background: var(--canvas-2);
+  border-bottom: var(--hairline) solid var(--canvas-border);
+  fill: var(--on-dark-2);
+  stroke: var(--on-dark-2);
+}
+
+.react-flow__controls-button:hover {
+  background: #221f26;
+  fill: var(--on-dark);
+  stroke: var(--on-dark);
+}
+
+.react-flow__minimap {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: var(--hairline) solid var(--canvas-border);
+}

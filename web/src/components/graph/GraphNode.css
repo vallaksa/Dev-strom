@@ -1,0 +1,101 @@
+.graph-node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 220px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--canvas-2);
+  border: 1.5px solid var(--canvas-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  color: var(--on-dark);
+  font-family: var(--font-body);
+  box-shadow: var(--shadow-sm);
+  transition: opacity 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.graph-node:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.graph-node.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(184, 70, 13, 0.4);
+}
+
+.graph-node.is-dimmed {
+  opacity: 0.22;
+}
+
+.graph-node__glyph {
+  font-size: 1.05rem;
+  line-height: 1;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.graph-node__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.graph-node__type {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--on-dark-2);
+}
+
+.graph-node__label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* per-type accent (left border + glyph color) */
+.graph-node--repo { border-left-color: var(--node-repo); }
+.graph-node--repo .graph-node__glyph { color: var(--node-repo); }
+
+.graph-node--package { border-left-color: var(--node-package); }
+.graph-node--package .graph-node__glyph { color: var(--node-package); }
+
+.graph-node--module { border-left-color: var(--node-module); }
+.graph-node--module .graph-node__glyph { color: var(--node-module); }
+
+.graph-node--file { border-left-color: var(--node-file); }
+.graph-node--file .graph-node__glyph { color: var(--node-file); }
+
+.graph-node--class { border-left-color: var(--node-class); }
+.graph-node--class .graph-node__glyph { color: var(--node-class); }
+
+.graph-node--function {
+  border-left-color: var(--node-function);
+  border-radius: 999px;
+}
+.graph-node--function .graph-node__glyph { color: var(--node-function); }
+
+.graph-node--external_dep {
+  border-left-color: var(--node-external_dep);
+  border-style: dashed;
+}
+.graph-node--external_dep .graph-node__glyph { color: var(--node-external_dep); }
+
+.graph-node--service { border-left-color: var(--node-service); }
+.graph-node--service .graph-node__glyph { color: var(--node-service); }
+
+.graph-node--entrypoint {
+  border-left-color: var(--node-entrypoint);
+  background: #221a14;
+}
+.graph-node--entrypoint .graph-node__glyph { color: var(--node-entrypoint); }
+
+.react-flow__handle {
+  background: var(--canvas-border);
+  border: none;
+  width: 6px;
+  height: 6px;
+}

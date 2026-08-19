@@ -1,0 +1,102 @@
+.detail-panel {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--canvas-2);
+  border: var(--hairline) solid var(--canvas-border);
+  border-radius: var(--radius-md);
+  color: var(--on-dark);
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.detail-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.detail-panel__close {
+  background: none;
+  border: none;
+  color: var(--on-dark-2);
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.detail-panel__close:hover {
+  color: var(--on-dark);
+}
+
+.detail-panel__title {
+  font-family: var(--font-display);
+  color: var(--on-dark);
+  font-size: 1.2rem;
+  margin-bottom: var(--space-2);
+  word-break: break-word;
+}
+
+.detail-panel__path {
+  color: var(--on-dark-2);
+  margin-bottom: var(--space-2);
+  word-break: break-all;
+}
+
+.detail-panel__summary {
+  color: var(--on-dark-2);
+  font-size: 0.85rem;
+  margin-top: var(--space-3);
+}
+
+.detail-panel__section {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: var(--hairline) solid var(--canvas-border);
+}
+
+.detail-panel__section ul {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-panel__section li {
+  font-size: 0.8rem;
+  color: var(--on-dark-2);
+}
+
+.detail-panel__link {
+  background: none;
+  border: none;
+  color: var(--accent-soft);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.detail-panel__link:hover {
+  text-decoration: underline;
+}
+
+.detail-panel__edge-type {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--on-dark-2);
+  text-transform: uppercase;
+}
+
+.detail-panel__meta {
+  font-size: 0.72rem;
+  color: var(--on-dark-2);
+  background: var(--canvas);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin-top: var(--space-2);
+}
