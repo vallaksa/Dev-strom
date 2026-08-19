@@ -30,9 +30,11 @@ Edit `.env` and set:
 
 | Option | Command | Description |
 |--------|---------|-------------|
-| **UI** | `streamlit run ui.py` | Browser UI on port 8501. Requires FastAPI to be running first. |
-| **API** | `uvicorn api:api --reload` | HTTP server on port 8000. Must be running for the UI to work. |
+| **UI** | `streamlit run ui/Home.py` | Browser UI on port 8501. Requires FastAPI to be running first. |
+| **API** | `uvicorn app.api:api --reload` | HTTP server on port 8000. Must be running for the UI to work. |
 | **CLI** | `python scripts/run_graph.py "LangChain, LangGraph"` | Prints ideas to the terminal. Optional: `--count` (1–5), `--domain`, `--level`, `--enable-multi-query`, `--stream`, `--debug`. |
+
+`GET /health` (liveness) and `GET /ready` (readiness — pings the database when `DATABASE_URL` is configured) are available once the API is running.
 
 > **Note:** From V3-1 onwards, Streamlit calls FastAPI over HTTP. You must start **both** servers.
 
@@ -135,23 +137,33 @@ Final state: {tech_stack, web_context, ideas}
 
 ## Project layout
 
+Application code lives under `app/` (FastAPI server, LangGraph pipeline, database
+services) and `ui/` (Streamlit frontend). `scripts/` holds standalone CLI entry
+points; `migrations/` holds Alembic migrations.
+
 | Path | Purpose |
 |------|---------|
-| `graph.py` | LangGraph pipeline: state, `fetch_web_context`, `generate_ideas`, `expand_idea`. |
-| `tools.py` | LangChain web search tool (Tavily). |
-| `api.py` | FastAPI server: `POST /ideas`, `POST /expand`, `POST /export`. |
-| `ui.py` | Streamlit UI: generate, expand, download. |
-| `models/domain.py` | AI output models: `ProjectIdea`, `IdeasResponse`, `ExpandedIdea`. |
-| `models/dto.py` | HTTP request DTOs: `IdeasRequest`, `ExpandRequest`, `ExportRequest`. |
-| `services/api_client.py` | HTTP client used by Streamlit to call FastAPI. |
-| `services/db.py` | SQLAlchemy engine, session factory, `get_session()` context manager. |
-| `services/export_formatter.py` | Idea + extended plan → LLM-ready Markdown for download. |
+| `app/graph.py` | LangGraph pipeline: state, `fetch_web_context`, `generate_ideas`, `expand_idea`, model fallback chain. |
+| `app/tools.py` | LangChain web search tool (Tavily). |
+| `app/api.py` | FastAPI server: `POST /ideas`, `POST /expand`, `POST /export`, `GET /history`, `GET /runs/{run_id}`, `GET /health`, `GET /ready`. |
+| `app/config.py` | Typed settings (`pydantic-settings`): API keys, `DATABASE_URL`, model + fallbacks, LangSmith config, log level. |
+| `app/models/domain.py` | AI output models: `ProjectIdea`, `IdeasResponse`, `ExpandedIdea`. |
+| `app/models/dto.py` | HTTP request DTOs: `IdeasRequest`, `ExpandRequest`, `ExportRequest`. |
+| `app/services/db.py` | Lazily-created SQLAlchemy engine, session factory, `get_session()` context manager, `ping()`. |
+| `app/services/models.py` | SQLAlchemy ORM models: `User`, `Run`, `ExpandedIdea` (and `web_chunks`, scaffolded — see [RAG status](#rag-status-web_chunks) below). |
+| `app/services/run_service.py` | Run/expansion persistence: `save_run`, `save_expanded_idea`, `get_latest_expansion`, `load_history`, `get_run`. |
+| `app/services/export_formatter.py` | Idea + extended plan → LLM-ready Markdown for download. |
+| `ui/Home.py` | Streamlit UI entry point: generate, expand, download. |
+| `ui/api_client.py` | HTTP client used by Streamlit to call FastAPI. |
+| `ui/components.py` | Shared Streamlit UI components. |
+| `ui/pages/` | Additional Streamlit pages (e.g. History). |
 | `scripts/run_graph.py` | CLI entry point with `--stream` and `--debug` flags. |
 | `scripts/test_web_search.py` | Smoke-tests the Tavily search tool in isolation. |
-| `md/PLAN.md` | Full architecture plan (V1 → V3). |
-| `md/V1_TICKETS.md` | V1 Jira-style tickets. |
-| `md/V2_TICKETS.md` | V2 tickets (expand, export, multi-query, etc.). |
-| `md/V3_TICKETS.md` | V3 tickets (auth, DB, RAG, MCP, React). |
+| `migrations/` | Alembic migration environment and versions (`001_initial_schema.py`, ...). |
+| `docs/PLAN.md` | Full architecture plan (V1 → V3). |
+| `docs/V1_TICKETS.md` | V1 Jira-style tickets. |
+| `docs/V2_TICKETS.md` | V2 tickets (expand, export, multi-query, etc.). |
+| `docs/V3_TICKETS.md` | V3 tickets (auth, DB, RAG, MCP, React). |
 | `docs/Dev-Strom_API.postman_collection.json` | Postman collection for the API. |
 
 ---
@@ -181,7 +193,7 @@ DATABASE_URL=postgresql://postgres:devstrom@localhost:5432/devstrom
 
 ```bash
 source .venv/bin/activate
-python -c "from services.db import ping; print(ping()[:60])"
+python -c "from app.services.db import ping; print(ping()[:60])"
 # Expected: PostgreSQL 16.x (Debian...) on x86_64-pc-linux-gnu...
 ```
 
@@ -191,8 +203,18 @@ python -c "from services.db import ping; print(ping()[:60])"
 docker exec -it devstrom-postgres psql -U postgres -d devstrom -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
+### RAG status (`web_chunks`)
+
+The `web_chunks` table (`pgvector` embedding column, `app/services/models.py`)
+and its `ivfflat` index are created by migration `001_initial_schema.py`, but
+the RAG pipeline itself is **not wired up yet**: nothing writes embeddings
+into `web_chunks`, and the LangGraph pipeline (`app/graph.py`) has no
+retrieval node that reads from it. Web context currently comes only from the
+live Tavily search in `fetch_web_context` (`app/tools.py`). Treat
+`web_chunks` as scaffolding for a future ticket, not a working feature.
+
 ---
 
 ## License and docs
 
-- **Plan and tickets:** [md/PLAN.md](md/PLAN.md), [md/V1_TICKETS.md](md/V1_TICKETS.md), [md/V2_TICKETS.md](md/V2_TICKETS.md), [md/V3_TICKETS.md](md/V3_TICKETS.md)
+- **Plan and tickets:** [docs/PLAN.md](docs/PLAN.md), [docs/V1_TICKETS.md](docs/V1_TICKETS.md), [docs/V2_TICKETS.md](docs/V2_TICKETS.md), [docs/V3_TICKETS.md](docs/V3_TICKETS.md)
