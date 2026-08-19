@@ -146,6 +146,14 @@ def test_cartograph_core_modules_are_wired_on_import():
     assert api_module.get_cartograph_run is not None
 
 
+def test_cartograph_store_uses_backend_factory():
+    """API must pick Postgres vs Neo4j via get_cartograph_store(), not a hardcoded
+    PostgresJsonbStore, so CARTOGRAPH_STORE_BACKEND=neo4j actually takes effect."""
+    import inspect
+
+    assert "get_cartograph_store" in inspect.getsource(api_module)
+
+
 def test_cartograph_missing_openai_key_returns_503(client, monkeypatch):
     monkeypatch.setattr(api_module.settings, "openai_api_key", None)
     resp = client.post("/cartograph", json={"repo_url": "https://github.com/example/repo"})

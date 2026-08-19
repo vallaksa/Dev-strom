@@ -2,7 +2,7 @@
 
 > This is the single source of truth for the Dev-Strom roadmap.
 > All versions, decisions, and scope changes are tracked here.
-> See `V1_TICKETS.md`, `V2_TICKETS.md`, and (future) `V3_TICKETS.md` for granular Jira-style tickets.
+> See `V1_TICKETS.md`, `V2_TICKETS.md`, `V3_TICKETS.md`, and `BACKLOG.md` for granular tickets.
 
 ---
 
@@ -26,10 +26,71 @@ Ideas are grounded in **live web search results** so they are practical and curr
 | Version | Status      | Theme                                      |
 |---------|-------------|---------------------------------------------|
 | V1      | ✅ Complete  | Core idea generator (MVP)                  |
-| V2      | 🔄 In Progress | Feature expansion + UX polish             |
-| V3      | 📋 Planned   | Auth, DB, RAG pipeline, MCP, React UI      |
+| V2      | ✅ Complete  | Feature expansion + UX polish              |
+| V3      | ✅ Complete  | Postgres, history, MCP (auth/RAG descoped) |
+| F1–F4   | ✅ Complete  | Cartographer, Advisor, React UI, async jobs |
+| Neo4j live store | ✅ Wired, opt-in | CartographStore factory + Docker daemon |
+| V4      | 📋 Next     | Neo4j GraphRAG (not the Cartographer store) |
 
 ---
+
+---
+
+## Where we are (2026-08-19)
+
+V1–V3 (reduced V3 scope) and F1–F4 are in `main`. Cartographer still **defaults to Postgres JSONB**. Neo4j is installed on the server as a Docker daemon and is an **opt-in** CartographStore backend. Making Neo4j the default is a later decision, not part of wiring.
+
+### What actually runs on the server
+
+```
+Browser  →  React (web/, :5173) and/or Streamlit (ui/, :8501)
+                │
+                ▼
+         FastAPI (app.api, :8000)
+                │
+     ┌──────────┼──────────────┐
+     ▼          ▼              ▼
+ Postgres    Neo4j          postgres-mcp
+ (Docker,    (Docker,       (Docker, :3000)
+  :5432,      :7474/:7687,
+  global-     global-
+  network)    network)
+```
+
+Both databases are standalone Docker daemons on `global-network` with `restart: unless-stopped`. They are **not** started by Dev-Strom `docker-compose.yml`. Compose `db` is the portable/dev template; this server uses the existing `postgres` container. Neo4j is the container named `neo4j` (image `neo4j:5`).
+
+### API surface (shipped)
+
+| Method | Path | Notes |
+|--------|------|--------|
+| POST | `/ideas` | Idea generation |
+| POST | `/expand` | Expand one idea by pid |
+| POST | `/export` | Markdown export |
+| GET | `/history`, `/runs/{run_id}` | Persisted runs |
+| POST | `/cartograph` | Architecture graph; optional `?async=true` |
+| GET | `/cartograph/{run_id}` | Load a cartograph run |
+| POST | `/advise` | Improvement advisor; optional `?async=true` |
+| GET | `/advise/{run_id}` | Load an advisor run |
+| GET | `/jobs/{job_id}` | Poll async jobs |
+| GET | `/health`, `/ready` | Liveness / Postgres ping |
+
+### Cartographer persistence
+
+| Backend | When | Store |
+|---------|------|--------|
+| `postgres` (default) | `CARTOGRAPH_STORE_BACKEND` unset or `postgres` | `PostgresJsonbStore` |
+| `neo4j` | `CARTOGRAPH_STORE_BACKEND=neo4j` | `Neo4jStore` via `get_cartograph_store()` |
+
+`app/api.py` always calls `get_cartograph_store()`. Flipping the env var is the only app change needed to persist graphs in Neo4j. The F3 React UI does not care which backend is behind GET `/cartograph/{run_id}`.
+
+Live Neo4j round-trip is covered by `tests/integration/test_neo4j_live.py`, skipped when Bolt is unreachable so CI stays hermetic.
+
+### Not done yet (do not confuse with the above)
+
+- **V4 Neo4j GraphRAG** (`BACKLOG.md`) — entity/relationship extraction into a knowledge graph, replacing `web_chunks`. Infra (Neo4j daemon) is ready; the product feature is not.
+- **Google OAuth / JWT / key vault / per-user cache** — still deferred; anonymous user UUID.
+- **pgvector RAG pipeline** — `web_chunks` table exists; nothing writes or retrieves embeddings.
+- **Neo4j as the default CartographStore** — explicit later decision.
 
 ---
 
@@ -92,7 +153,7 @@ Output: 3 project ideas (name, problem, why_it_fits, value, plan)
 
 ---
 
-# 🔄 V2 — Feature Expansion (In Progress)
+# ✅ V2 — Feature Expansion (Complete)
 
 ## What V2 Adds
 
@@ -113,18 +174,20 @@ V2 extends V1 with richer inputs, smarter web context, more control over output,
 | DEVSTROM-V2-9  | Caching by input key                | ⏭️ Skipped → absorbed into V3 (DEVSTROM-V3-9) |
 | DEVSTROM-V2-10 | Structured logging and tracing      | ❌ Dropped — premature for now|
 
-**V2 Progress: 4/10 done. Remaining V2 tickets closed — history and caching absorbed into V3.**
+**V2 Progress: 4/10 done, rest closed.** History and caching were absorbed into V3; remaining V2 tickets were dropped. V2 is complete.
 
 ## V2 Decisions Made
 
 - `@st.cache_data` added in `ui.py` for in-session caching (same inputs → instant result without API call).
 - `@lru_cache` on agent getters (`_get_idea_agent`, `_get_expand_agent`) for singleton agent objects (avoids repeated setup cost, not caching results).
 - Markdown fence stripping uses `\A` / `\Z` anchors (not `re.MULTILINE`) to avoid corrupting JSON responses from the LLM.
-- Streamlit UI currently calls `graph_app.invoke()` directly (not via FastAPI). This is **a known coupling to fix in V3**.
+- Streamlit originally called `graph_app.invoke()` directly. **Fixed in V3-1:** Streamlit talks to FastAPI over HTTP (`ui/api_client.py`).
 
 ---
 
-# 📋 V3 — Platform Architecture (Planned)
+# ✅ V3 — Platform (Complete, reduced scope)
+
+Original V3 imagined auth, RAG, MCP, and React as one milestone. **What shipped as V3** is the 7 tickets in `V3_TICKETS.md`: FastAPI decoupling, Postgres + Alembic, run history, Streamlit History, and MCP dedup. Auth, key vault, RAG retrieval, TTL cache, and the original React tickets were moved to `BACKLOG.md`. React later shipped as F3 (no auth). The diagrams below are the **original V3 design**, kept for history — they are not a description of production today. For production, use [Where we are](#where-we-are-2026-08-19).
 
 ## Why V3 Exists
 
@@ -138,7 +201,7 @@ V2 proves the product. V3 makes it a real platform:
 
 ---
 
-## V3 Architecture
+## V3 Architecture (original design — not production)
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -427,7 +490,7 @@ Tavily → chunk text into ~500 char paragraphs
 
 ## V3 Tickets
 
-> Detailed tickets in `V3_TICKETS.md`. 19 granular, independent tickets.
+> Original 19-ticket design below. **What actually shipped:** 7 tickets in `V3_TICKETS.md` (V3-1..V3-7: decouple UI, Postgres, Alembic, history API, History page, MCP server, MCP in agent). Auth/RAG/React-as-V3 tickets were descoped; React later shipped as F3 without auth.
 
 | Key             | Title                                            | Phase |
 |-----------------|--------------------------------------------------|-------|
@@ -472,4 +535,42 @@ By the end of V3, you will have built and understood:
 
 ---
 
-*Last updated: 2026-02-22. Update this file as decisions are made or scope changes.*
+---
+
+# Post-V3 — F1–F4 (Complete)
+
+Shipped on `main` after the reduced V3 set. Numbering is the feature series used in merge commits, not Jira keys.
+
+| Feature | What shipped |
+|---------|----------------|
+| **F1 Cartographer** | `POST /cartograph` + `GET /cartograph/{run_id}`. Graph persisted by `CartographStore`. Default backend: Postgres JSONB. |
+| **F1-4 Neo4j adapter** | `Neo4jStore` (native `:CartographRun` / `:GraphNode` / dynamic rels) and `get_cartograph_store()`. Selected with `CARTOGRAPH_STORE_BACKEND=neo4j`. |
+| **F2 Advisor** | `POST /advise` + `GET /advise/{run_id}` plus Streamlit Advisor page. |
+| **F3 React UI** | Vite/React/TS app in `web/`: Ideas, History, Cartographer (React Flow), Advisor. Same FastAPI backend. Streamlit remains. |
+| **F4 Jobs** | In-process `create_job` / `get_job` / `run_job`. Opt-in `?async=true` on `/cartograph` and `/advise`; poll `GET /jobs/{job_id}`. |
+
+## Neo4j live store (2026-08-19)
+
+This is **not** GraphRAG. It is the Cartographer persistence backend plus server infra.
+
+1. Neo4j runs as Docker container `neo4j` (`neo4j:5`) on `global-network`, same network as `postgres`, `restart: unless-stopped`, ports `7474` / `7687`, volume `neo4j_data`.
+2. `Neo4jStore` save→get was smoke-tested against that instance (run-scoped merge keys, `ProjectGraph` round trip).
+3. `app/api.py` uses `get_cartograph_store()`.
+4. Default remains `CARTOGRAPH_STORE_BACKEND=postgres`. Documented in `.env.example` and README.
+5. Endpoint e2e (LLM mocked, real Neo4j) confirmed GET shape matches what the F3 UI already consumes.
+6. Gated live test: `tests/integration/test_neo4j_live.py`.
+7. **Not done:** flipping the default to Neo4j.
+
+Host Bolt URI: `neo4j://localhost:7687`. From another container on `global-network`: `neo4j://neo4j:7687`. Auth matches `NEO4J_AUTH` (default `neo4j/devstrom`).
+
+---
+
+# V4 — Next
+
+Flagship: **Neo4j GraphRAG** in `BACKLOG.md` (entities/relationships from web context, vector index + traversal). That work can use the Neo4j daemon already running. Do not treat Cartographer's optional `Neo4jStore` as GraphRAG.
+
+Still deferred: Google OAuth/JWT, API key vault, pgvector retrieval, Redis/queue workers, making Neo4j the CartographStore default.
+
+---
+
+*Last updated: 2026-08-19. Update this file as decisions are made or scope changes.*

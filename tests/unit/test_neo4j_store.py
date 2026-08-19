@@ -74,15 +74,23 @@ def make_project_graph() -> ProjectGraph:
 
 
 def test_no_uri_raises_clear_error_on_save():
-    store = Neo4jStore(uri=None, user=None, password=None)
-    with pytest.raises(RuntimeError, match="NEO4J_URI"):
-        store.save(make_project_graph())
+    with patch("app.cartographer.store.settings") as mock_settings:
+        mock_settings.neo4j_uri = None
+        mock_settings.neo4j_user = None
+        mock_settings.neo4j_password = None
+        store = Neo4jStore(uri=None, user=None, password=None)
+        with pytest.raises(RuntimeError, match="NEO4J_URI"):
+            store.save(make_project_graph())
 
 
 def test_no_uri_raises_clear_error_on_get():
-    store = Neo4jStore(uri=None, user=None, password=None)
-    with pytest.raises(RuntimeError, match="NEO4J_URI"):
-        store.get("some-run-id")
+    with patch("app.cartographer.store.settings") as mock_settings:
+        mock_settings.neo4j_uri = None
+        mock_settings.neo4j_user = None
+        mock_settings.neo4j_password = None
+        store = Neo4jStore(uri=None, user=None, password=None)
+        with pytest.raises(RuntimeError, match="NEO4J_URI"):
+            store.get("some-run-id")
 
 
 def test_construction_does_not_connect():

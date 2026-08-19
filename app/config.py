@@ -10,7 +10,7 @@ instead of calling `os.getenv(...)` around the codebase.
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,7 +35,10 @@ class Settings(BaseSettings):
 
     # ── graph database (F1-4, Neo4jStore) ─────────────────────────────────
     neo4j_uri: str | None = Field(default=None, alias="NEO4J_URI")
-    neo4j_user: str | None = Field(default=None, alias="NEO4J_USER")
+    neo4j_user: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("NEO4J_USER", "NEO4J_USERNAME"),
+    )
     neo4j_password: str | None = Field(default=None, alias="NEO4J_PASSWORD")
 
     # Which CartographStore backend to use: "postgres" (default) or "neo4j".

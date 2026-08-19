@@ -28,15 +28,16 @@ from app.services.run_service import (
 )
 
 # ── Project Cartographer (F1) ────────────────────────────────────────────────
-# Persistence lives on CartographStore (PostgresJsonbStore.save / .get), not
-# module-level functions. Guard ImportError so app.api still loads if the
-# cartographer package is missing; routes return 503 when these are None.
+# Persistence is selected by CARTOGRAPH_STORE_BACKEND via get_cartograph_store()
+# (postgres JSONB by default, neo4j when configured). Guard ImportError so
+# app.api still loads if the cartographer package is missing; routes return
+# 503 when these are None.
 try:
     from app.cartographer.analyze import analyze_architecture
     from app.cartographer.pipeline import cartograph
-    from app.cartographer.store import PostgresJsonbStore
+    from app.cartographer.store import get_cartograph_store
 
-    _cartograph_store = PostgresJsonbStore()
+    _cartograph_store = get_cartograph_store()
     save_cartograph_run = _cartograph_store.save
     get_cartograph_run = _cartograph_store.get
 except ImportError as exc:

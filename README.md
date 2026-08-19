@@ -242,8 +242,40 @@ docker compose up --build
 
 This starts `db` (Postgres with pgvector), a one-shot `migrate` service that runs `alembic upgrade head`
 before anything else starts, `api` (FastAPI on `:8000`), and `ui` (Streamlit on `:8501`, wired to talk to
-`api` over the compose network via `API_BASE_URL=http://api:8000`). Validate the compose file without a
-running daemon via `docker compose config`.
+`api` over the compose network via `API_BASE_URL=http://api:8000`). Neo4j is not part of this compose file;
+on the server it runs as a standalone Docker daemon on `global-network` next to Postgres (see
+[Project Cartographer / Neo4j](#project-cartographer--neo4j)). Validate the compose file without a running
+daemon via `docker compose config`.
+
+## Project Cartographer / Neo4j
+
+Cartographer stores runs in Postgres JSONB by default (`CARTOGRAPH_STORE_BACKEND=postgres`). Neo4j is an
+optional graph store, hosted the same way as Postgres on this server: a standalone Docker container on
+`global-network` with `restart: unless-stopped`.
+
+```bash
+docker run -d \
+  --name neo4j \
+  --restart unless-stopped \
+  --network global-network \
+  -p 7474:7474 \
+  -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/devstrom \
+  -v neo4j_data:/data \
+  neo4j:5
+```
+
+Then in `.env` (must match `NEO4J_AUTH`, default `neo4j/devstrom`):
+
+```
+NEO4J_URI=neo4j://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=devstrom
+CARTOGRAPH_STORE_BACKEND=neo4j
+```
+
+From another container on `global-network`, use `NEO4J_URI=neo4j://neo4j:7687`. Restart the API after
+changing these variables. Leave `CARTOGRAPH_STORE_BACKEND=postgres` (or unset) if you are not using Neo4j.
 
 ## PostgreSQL MCP (V3-6 / V3-7)
 
