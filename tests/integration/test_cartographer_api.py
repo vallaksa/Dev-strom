@@ -11,12 +11,49 @@ call, whether or not feat/f1-core has landed in this worktree yet.
 
 from app import api as api_module
 
-try:
-    from app.services.jobs import get_job as _get_job
+import importlib.util
 
-    _JOBS_AVAILABLE = True
-except ImportError:
-    _JOBS_AVAILABLE = False
+_JOBS_AVAILABLE = importlib.util.find_spec("app.services.jobs") is not None
+
+
+def _install_fake_jobs(monkeypatch) -> dict:
+    """app.services.jobs (real implementation) needs a live Postgres session
+    - out of scope for these tests, which only exercise app.api's scheduling
+    logic (create a job, hand it to BackgroundTasks, poll it). Swap in a
+    tiny in-memory fake bound to api_module's imported names, same pattern
+    this file already uses for save_cartograph_run/get_cartograph_run etc.
+    Returns the backing dict for direct inspection if needed.
+    """
+    store: dict[str, dict] = {}
+
+    def _create_job(kind: str, params: dict) -> str:
+        job_id = f"job-{len(store) + 1}"
+        store[job_id] = {
+            "job_id": job_id,
+            "kind": kind,
+            "status": "pending",
+            "params": params,
+            "result": None,
+            "error": None,
+        }
+        return job_id
+
+    def _fake_get_job(job_id: str) -> dict | None:
+        return store.get(job_id)
+
+    def _run_job(job_id: str, fn) -> None:
+        store[job_id]["status"] = "running"
+        try:
+            store[job_id]["result"] = fn()
+            store[job_id]["status"] = "done"
+        except Exception as exc:  # pragma: no cover - exercised via the error test
+            store[job_id]["error"] = str(exc)
+            store[job_id]["status"] = "error"
+
+    monkeypatch.setattr(api_module, "create_job", _create_job)
+    monkeypatch.setattr(api_module, "get_job", _fake_get_job)
+    monkeypatch.setattr(api_module, "run_job", _run_job)
+    return store
 
 
 def _fake_project_graph() -> dict:
@@ -149,6 +186,7 @@ def test_cartograph_async_returns_202_with_job_id(client, monkeypatch):
     monkeypatch.setattr(api_module, "cartograph", lambda target, repo_url=None: graph)
     monkeypatch.setattr(api_module, "analyze_architecture", lambda g: report)
     monkeypatch.setattr(api_module, "save_cartograph_run", lambda pg, ar: "cartograph-run-async")
+    _install_fake_jobs(monkeypatch)
 
     resp = client.post(
         "/cartograph",
@@ -163,10 +201,10 @@ def test_cartograph_async_returns_202_with_job_id(client, monkeypatch):
 
     # TestClient runs BackgroundTasks synchronously right after the response
     # is generated, so the job should have already completed by the time we
-    # get here - if app.services.jobs is available in this worktree.
-    if not _JOBS_AVAILABLE:
-        return  # app.services.jobs not present in this worktree - nothing more to assert
-    record = _get_job(body["job_id"])
+    # get here. app.services.jobs itself is exercised separately (real
+    # Postgres-backed implementation) in tests/unit/test_jobs.py; here we
+    # only need app.api's scheduling logic against the same contract.
+    record = api_module.get_job(body["job_id"])
     assert record is not None
     assert record["status"] == "done"
     assert record["result"]["run_id"] == "cartograph-run-async"
@@ -181,6 +219,7 @@ def test_cartograph_async_job_records_error_on_pipeline_failure(client, monkeypa
     monkeypatch.setattr(api_module, "cartograph", boom)
     monkeypatch.setattr(api_module, "analyze_architecture", lambda g: _fake_architecture_report())
     monkeypatch.setattr(api_module, "save_cartograph_run", lambda pg, ar: "unused")
+    _install_fake_jobs(monkeypatch)
 
     resp = client.post(
         "/cartograph",
@@ -192,9 +231,7 @@ def test_cartograph_async_job_records_error_on_pipeline_failure(client, monkeypa
     assert resp.status_code == 202
     job_id = resp.json()["job_id"]
 
-    if not _JOBS_AVAILABLE:
-        return
-    record = _get_job(job_id)
+    record = api_module.get_job(job_id)
     assert record is not None
     assert record["status"] == "error"
     assert "clone failed" in record["error"]
