@@ -167,3 +167,38 @@ class AdvisorRun(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"),
     )
+
+
+# ── jobs (F4-surface: in-process background job runner) ─────────────────────────
+class Job(Base):
+    """One row per background job (e.g. an async /cartograph or /advise run).
+
+    `params` captures the inputs the job was started with; `result` is set
+    once the job finishes successfully (must be JSON-serializable); `error`
+    is set (as a plain string, via `str(exc)`) if the job's function raised.
+    `status` is one of app.services.jobs.JobStatus's values, stored as plain
+    text rather than a Postgres enum to keep migrations simple.
+
+    `updated_at` has a server_default for row creation, but Postgres does not
+    auto-update it on UPDATE without a trigger - app.services.jobs.run_job
+    is responsible for setting it explicitly on every status transition.
+    """
+
+    __tablename__ = "jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'pending'"))
+    params: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+    )
