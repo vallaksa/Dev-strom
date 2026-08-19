@@ -80,3 +80,25 @@ class AdviseRequest(BaseModel):
 class AdviseResponse(BaseModel):
     run_id: str
     advisor_report: dict
+
+
+# ── Async Jobs (F4) ───────────────────────────────────────────────────────────
+# Documents the `?async=true` response shape for POST /cartograph and
+# POST /advise, and the GET /jobs/{job_id} response shape. Like
+# CartographResponse/AdviseResponse above, these aren't wired up as FastAPI
+# response_model today - just documentation of the contract.
+
+class JobAcceptedResponse(BaseModel):
+    job_id: str
+    status: str = Field(default="pending", description="Always 'pending' immediately after scheduling")
+
+
+class JobResponse(BaseModel):
+    job_id: str
+    kind: str
+    status: str
+    params: dict
+    result: dict | None = None
+    error: str | None = None
+    created_at: str
+    updated_at: str
