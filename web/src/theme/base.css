@@ -1,0 +1,330 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Base / reset + editorial motifs shared across the app. Component-level
+   styling lives alongside components; this file is for resets, typography
+   defaults, and small reusable utility classes (labels, buttons, badges).
+   ───────────────────────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 var(--space-3);
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 2.6rem;
+  line-height: 1.08;
+}
+
+h2 {
+  font-size: 1.7rem;
+  line-height: 1.15;
+}
+
+h3 {
+  font-size: 1.25rem;
+}
+
+p {
+  margin: 0 0 var(--space-3);
+  color: var(--ink-2);
+}
+
+a {
+  color: var(--accent);
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ── uppercase mono "label" motif ─────────────────────────────────────── */
+.mono-label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.mono-label.accent {
+  color: var(--accent);
+}
+
+/* ── roman-numeral / numbered section marker motif ────────────────────── */
+.section-marker {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-2);
+}
+
+.section-marker::before {
+  content: attr(data-index) ".";
+  color: var(--ink-3);
+}
+
+/* ── hairline rule ─────────────────────────────────────────────────────── */
+.hr {
+  border: none;
+  border-top: var(--hairline) solid var(--border);
+  margin: var(--space-5) 0;
+}
+
+/* ── buttons ───────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease,
+    transform 60ms ease;
+  border: var(--hairline) solid transparent;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #9c3b0b;
+  border-color: #9c3b0b;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-3);
+  border-color: transparent;
+  padding: var(--space-2) var(--space-3);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.btn-sm {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.68rem;
+}
+
+/* ── inputs ────────────────────────────────────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.input,
+select.input,
+textarea.input {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-3);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.input::placeholder {
+  color: var(--ink-3);
+}
+
+/* ── card / panel ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: var(--hairline) solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+}
+
+.panel-dark {
+  background: var(--canvas);
+  color: var(--on-dark);
+  border: var(--hairline) solid var(--canvas-border);
+  border-radius: var(--radius-md);
+}
+
+/* ── badge / chip ──────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--hairline) solid var(--border);
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
+
+.badge-accent {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.badge-outline {
+  background: transparent;
+}
+
+/* ── impact / effort badges ───────────────────────────────────────────── */
+.badge-high {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.badge-medium {
+  color: #fff;
+  background: #a3721f;
+  border-color: #a3721f;
+}
+
+.badge-low {
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+/* ── scrollbars on dark panels ─────────────────────────────────────────── */
+.panel-dark ::-webkit-scrollbar,
+.dark-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.panel-dark ::-webkit-scrollbar-thumb,
+.dark-scroll::-webkit-scrollbar-thumb {
+  background: var(--canvas-border);
+  border-radius: 8px;
+}
+
+/* ── generic loading / error states ──────────────────────────────────── */
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
+}
+
+.state-block.centered {
+  align-items: center;
+  text-align: center;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-text {
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+/* ── shared grid utility (idea cards, etc.) ─────────────────────────── */
+.ideas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}

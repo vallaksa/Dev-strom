@@ -1,0 +1,84 @@
+.graph-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--canvas-2);
+  border: var(--hairline) solid var(--canvas-border);
+  border-radius: var(--radius-md);
+  color: var(--on-dark);
+  font-size: 0.78rem;
+  max-width: 220px;
+}
+
+.graph-legend__items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.graph-legend__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--on-dark-2);
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  text-transform: capitalize;
+  cursor: pointer;
+  padding: 2px 0;
+  text-align: left;
+  opacity: 0.45;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+.graph-legend__item.is-active {
+  opacity: 1;
+  color: var(--on-dark);
+}
+
+.graph-legend__item--static {
+  cursor: default;
+  opacity: 1;
+  color: var(--on-dark-2);
+}
+
+.graph-legend__count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--on-dark-2);
+  font-size: 0.68rem;
+}
+
+.graph-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.graph-legend__swatch--repo { background: var(--node-repo); }
+.graph-legend__swatch--package { background: var(--node-package); }
+.graph-legend__swatch--module { background: var(--node-module); }
+.graph-legend__swatch--file { background: var(--node-file); }
+.graph-legend__swatch--class { background: var(--node-class); }
+.graph-legend__swatch--function { background: var(--node-function); border-radius: 50%; }
+.graph-legend__swatch--external_dep { background: var(--node-external_dep); border-radius: 2px; }
+.graph-legend__swatch--service { background: var(--node-service); }
+.graph-legend__swatch--entrypoint { background: var(--node-entrypoint); }
+
+.graph-legend__line {
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--on-dark-2);
+  flex-shrink: 0;
+}
+
+.graph-legend__line--contains { border-top-color: var(--edge-contains); }
+.graph-legend__line--imports { border-top-color: var(--edge-imports); }
+.graph-legend__line--calls { border-top-color: var(--edge-calls); }
+.graph-legend__line--depends_on { border-top-color: var(--edge-depends_on); border-top-style: dashed; }
+.graph-legend__line--exposes { border-top-color: var(--edge-exposes); }
+.graph-legend__line--reads_writes { border-top-color: var(--edge-reads_writes); border-top-style: dashed; }

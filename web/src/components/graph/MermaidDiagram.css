@@ -1,0 +1,12 @@
+.mermaid-diagram {
+  background: var(--canvas);
+  border: var(--hairline) solid var(--canvas-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  overflow-x: auto;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}

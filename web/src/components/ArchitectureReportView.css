@@ -1,0 +1,69 @@
+.arch-report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-6);
+}
+
+.arch-report__summary p {
+  font-size: 1rem;
+  margin-bottom: var(--space-3);
+}
+
+.arch-report__layers {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.arch-report__grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-5);
+}
+
+.arch-report__components {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.arch-report__component strong {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+}
+
+.arch-report__component p {
+  margin: 4px 0;
+  font-size: 0.88rem;
+}
+
+.arch-report__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.arch-report__risks ul {
+  margin: var(--space-3) 0 0;
+  padding-left: 1.2em;
+}
+
+.arch-report__risks li {
+  color: var(--ink-2);
+  margin-bottom: var(--space-2);
+}
+
+.arch-report__mermaid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+@media (max-width: 900px) {
+  .arch-report__grid {
+    grid-template-columns: 1fr;
+  }
+}
