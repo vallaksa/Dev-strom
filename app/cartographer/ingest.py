@@ -9,6 +9,7 @@ local path.
 """
 
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -62,23 +63,39 @@ def _validate_repo_url(repo_url: str) -> None:
         raise IngestError(f"Malformed repo URL (no host): {repo_url!r}")
 
 
+# Directories excluded from the size-cap walk — mirror parse.py's ignore set so a
+# local checkout's .git / .venv / node_modules don't falsely trip the cap on repos
+# we can otherwise parse fine (those dirs are skipped during parsing anyway).
+_SIZE_IGNORE_DIRS = frozenset({
+    ".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".idea", ".gradle",
+})
+
+
 def _check_size_caps(root: Path) -> None:
     total_bytes = 0
     total_files = 0
-    for p in root.rglob("*"):
-        if p.is_symlink() or not p.is_file():
-            continue
-        total_files += 1
-        total_bytes += p.stat().st_size
-        if total_files > MAX_REPO_FILES:
-            raise IngestError(
-                f"Repo at {root} exceeds the {MAX_REPO_FILES}-file cap; refusing to ingest."
-            )
-        if total_bytes > MAX_REPO_BYTES:
-            raise IngestError(
-                f"Repo at {root} exceeds the {MAX_REPO_BYTES // (1024 * 1024)}MB cap; "
-                "refusing to ingest."
-            )
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Prune ignored dirs in-place so os.walk doesn't descend into them.
+        dirnames[:] = [
+            d for d in dirnames
+            if d not in _SIZE_IGNORE_DIRS and not d.endswith(".egg-info")
+        ]
+        for name in filenames:
+            p = Path(dirpath) / name
+            if p.is_symlink() or not p.is_file():
+                continue
+            total_files += 1
+            total_bytes += p.stat().st_size
+            if total_files > MAX_REPO_FILES:
+                raise IngestError(
+                    f"Repo at {root} exceeds the {MAX_REPO_FILES}-file cap; refusing to ingest."
+                )
+            if total_bytes > MAX_REPO_BYTES:
+                raise IngestError(
+                    f"Repo at {root} exceeds the {MAX_REPO_BYTES // (1024 * 1024)}MB cap; "
+                    "refusing to ingest."
+                )
 
 
 def clone_repo(repo_url: str, dest: str | None = None, depth: int = 1) -> str:
