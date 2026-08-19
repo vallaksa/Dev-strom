@@ -193,6 +193,24 @@ docker exec -it devstrom-postgres psql -U postgres -d devstrom -c "CREATE EXTENS
 
 ---
 
+## PostgreSQL MCP (V3-6 / V3-7)
+
+Dev-Strom uses the standalone [postgresql-mcp](https://github.com/vallaksa/postgresql-mcp) server (Docker, Streamable HTTP) so the idea agent can query past `runs` and avoid duplicate ideas.
+
+**Prerequisites:** `postgresql-mcp` running (e.g. `curl http://127.0.0.1:3000/health`).
+
+Add to `.env`:
+
+```
+MCP_HTTP_URL=http://127.0.0.1:3000/mcp
+MCP_API_KEY=<same key as postgresql-mcp Docker>
+ENABLE_MCP=true
+```
+
+With `ENABLE_MCP=false`, idea generation behaves as before (no MCP tools).
+
+---
+
 ## License and docs
 
 - **Plan and tickets:** [md/PLAN.md](md/PLAN.md), [md/V1_TICKETS.md](md/V1_TICKETS.md), [md/V2_TICKETS.md](md/V2_TICKETS.md), [md/V3_TICKETS.md](md/V3_TICKETS.md)

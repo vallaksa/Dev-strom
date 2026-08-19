@@ -4,10 +4,11 @@ from functools import lru_cache
 from typing import TypedDict
 
 from deepagents import create_deep_agent
-from langchain.agents.middleware import wrap_model_call
 from langgraph.graph import END, START, StateGraph
 
 from app.models.domain import ProjectIdea
+from app.services.mcp_client import is_mcp_enabled, load_mcp_tools
+from app.services.models import ANONYMOUS_USER_ID
 from app.tools import web_search_project_ideas
 
 
@@ -60,22 +61,15 @@ def _extract_last_content(result: dict) -> str:
 
 # ── agent singletons (created once, reused) ───────────────────────────────────
 
-@wrap_model_call
-def _log_model_call(request, handler):
-    print("[DevStrom middleware] model call (generate_ideas agent)")
-    print(_get_idea_agent.cache_info()) 
-    print(_get_expand_agent.cache_info()) 
-    return handler(request)
-
-
-@lru_cache(maxsize=None)
-def _get_idea_agent():
+@lru_cache(maxsize=2)
+def _get_idea_agent(use_mcp: bool):
+    tools = list(load_mcp_tools()) if use_mcp else []
+    prompt = _IDEAS_SYSTEM_MCP if use_mcp else _IDEAS_SYSTEM
     return create_deep_agent(
         name="idea_generator",
         model=MODEL,
-        tools=[],
-        system_prompt=_IDEAS_SYSTEM,
-        middleware=[_log_model_call],
+        tools=tools,
+        system_prompt=prompt,
     )
 
 
@@ -149,6 +143,20 @@ Follow these instructions exactly and obey all guardrails:
    - Ensure each "problem_statement" describes a solvable engineering problem, not a physical impossibility.
 """
 
+_IDEAS_SYSTEM_MCP = _IDEAS_SYSTEM.replace(
+    "   - Do NOT use any tools or external APIs.\n",
+    "   - Use the provided MCP database tools to query past runs before generating ideas.\n",
+) + """\
+10. MCP DEDUPLICATION (required when database tools are available):
+   - The user message includes `user_id` and `tech_stack`.
+   - Before writing JSON, call the `query` tool to fetch the last 3 runs for this user and tech stack from the `runs` table (column `ideas` is JSONB).
+   - Review past idea names and problem statements; ensure every new idea differs meaningfully in problem, architecture, or primary focus.
+   - Example SQL:
+     SELECT ideas, created_at FROM runs
+     WHERE user_id = '<user_id>' AND tech_stack ILIKE '%<tech_stack>%'
+     ORDER BY created_at DESC LIMIT 3
+"""
+
 _EXPAND_SYSTEM = """\
 You are an implementation advisor. Given a project idea (name, problem_statement, implementation_plan), \
 expand it into exactly 5 concise, actionable next steps a developer can follow.
@@ -196,14 +204,18 @@ def generate_ideas(state: DevStromState) -> dict:
     web_context = state["web_context"]
     count = max(1, min(5, state.get("count", 3)))
 
-    parts = [f"Tech stack: {tech_stack}"]
+    parts = [
+        f"Tech stack: {tech_stack}",
+        f"user_id: {ANONYMOUS_USER_ID}",
+    ]
     if domain := state.get("domain"):
         parts.append(f"Domain (bias ideas toward): {domain}")
     if level := state.get("level"):
         parts.append(f"Level (bias ideas toward): {level}")
     parts.append(f"\nWeb context:\n{web_context[:4000]}\n\nOutput exactly {count} ideas as JSON:\n")
 
-    result = _get_idea_agent().invoke({
+    use_mcp = is_mcp_enabled()
+    result = _get_idea_agent(use_mcp).invoke({
         "messages": [{"role": "user", "content": "\n".join(parts)}],
     })
 
