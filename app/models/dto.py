@@ -3,7 +3,7 @@ DTO models — describe what crosses the HTTP boundary (request and response bod
 These are shaped around the FastAPI contract, not the AI layer.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── Requests ──────────────────────────────────────────────────────────────────
@@ -24,3 +24,31 @@ class ExpandRequest(BaseModel):
 class ExportRequest(BaseModel):
     run_id: str = Field(..., description="Run ID from POST /ideas response")
     pid: int = Field(..., ge=1, description="ID of the expanded idea to export (must have been expanded first)")
+
+
+# ── Project Cartographer (F1) ────────────────────────────────────────────────
+# NOTE: project_graph / architecture_report below are typed as plain `dict`
+# rather than the real `ProjectGraph` / `ArchitectureReport` pydantic models
+# (app.cartographer.model, owned by feat/f1-core and not yet present in this
+# worktree). The API layer dumps those models to dict before returning, so a
+# generic dict field here is deliberate — it decouples this DTO from a
+# contract module that doesn't exist yet, and still documents the response
+# shape. Tighten to the real types once feat/f1-core lands.
+
+class CartographRequest(BaseModel):
+    repo_url: str | None = Field(default=None, description="Git URL of the repo to map")
+    path: str | None = Field(default=None, description="Local filesystem path to the repo to map")
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self) -> "CartographRequest":
+        has_repo = bool(self.repo_url and self.repo_url.strip())
+        has_path = bool(self.path and self.path.strip())
+        if has_repo == has_path:  # neither or both provided
+            raise ValueError("Provide exactly one of 'repo_url' or 'path'.")
+        return self
+
+
+class CartographResponse(BaseModel):
+    run_id: str
+    project_graph: dict
+    architecture_report: dict
