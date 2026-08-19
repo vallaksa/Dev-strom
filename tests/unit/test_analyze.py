@@ -80,7 +80,7 @@ def test_parse_architecture_report_valid_json(analyze_mod):
     report = analyze_mod.parse_architecture_report(raw)
     assert report.summary == "A small FastAPI service backed by Postgres."
     assert len(report.components) == 2
-    assert report.components[0].name == "API"
+    assert report.components[0]["name"] == "API"
     assert report.mermaid.startswith("flowchart TD")
     assert report.risks == ["No integration tests found."]
 
