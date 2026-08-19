@@ -1,0 +1,86 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Dev-Strom design tokens — "warm editorial paper" theme, in the spirit of
+   october.dev. Every color/spacing/type decision in the app should resolve
+   through a custom property defined here. Do not hardcode hex values in
+   component CSS — add or reuse a token instead.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
+:root {
+  /* ── paper / surfaces ─────────────────────────────────────────────── */
+  --bg: #f3f0e8;
+  --surface: #faf8f3;
+  --surface-2: #e9e4d9;
+  --border: #bfb5a2;
+  --border-soft: #dcd4c5;
+
+  /* ── ink (text on paper) ──────────────────────────────────────────── */
+  --ink: #181511;
+  --ink-2: #554e45;
+  --ink-3: #746c61;
+
+  /* ── accent (October rust) ────────────────────────────────────────── */
+  --accent: #b8460d;
+  --accent-soft: #f3a271;
+  --accent-ink: #fff9f2; /* text on top of solid accent */
+
+  /* ── dark canvas / code surfaces ──────────────────────────────────── */
+  --canvas: #18171c;
+  --canvas-2: #111014;
+  --on-dark: #fffaf3;
+  --on-dark-2: #b8b2a6;
+  --canvas-border: #35333a;
+
+  /* ── semantic status (kept warm, not saturated primary colors) ────── */
+  --ok: #4c7a3f;
+  --warn: #b8460d;
+  --danger: #a5291d;
+  --info: #3f6b7a;
+
+  /* ── type ──────────────────────────────────────────────────────────── */
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  /* ── spacing scale ─────────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ── radii / lines ─────────────────────────────────────────────────── */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --hairline: 1px;
+
+  /* ── shadow (very subtle, paper does not float much) ─────────────── */
+  --shadow-sm: 0 1px 2px rgba(24, 21, 17, 0.06);
+  --shadow-md: 0 4px 16px rgba(24, 21, 17, 0.1);
+  --shadow-lg: 0 12px 32px rgba(24, 21, 17, 0.16);
+
+  /* ── node-type accent colors (Cartographer graph) ─────────────────── */
+  --node-repo: #f3a271;
+  --node-package: #d9a441;
+  --node-module: #7aa6c2;
+  --node-file: #9a9488;
+  --node-class: #c17ac2;
+  --node-function: #6fae7f;
+  --node-external_dep: #a5291d;
+  --node-service: #4f8fd1;
+  --node-entrypoint: #b8460d;
+
+  /* ── edge-type colors (Cartographer graph) ────────────────────────── */
+  --edge-contains: #746c61;
+  --edge-imports: #7aa6c2;
+  --edge-calls: #6fae7f;
+  --edge-depends_on: #d9a441;
+  --edge-exposes: #b8460d;
+  --edge-reads_writes: #c17ac2;
+}
