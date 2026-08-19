@@ -1,0 +1,36 @@
+.idea-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.idea-card__head {
+  margin-bottom: var(--space-2);
+}
+
+.idea-card__label {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-1);
+}
+
+.idea-card ul,
+.idea-card ol {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--ink-2);
+}
+
+.idea-card li {
+  margin-bottom: var(--space-1);
+}
+
+.idea-card__expansion {
+  margin-top: var(--space-2);
+}
+
+.idea-card__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: var(--hairline) solid var(--border-soft);
+}

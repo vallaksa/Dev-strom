@@ -1,0 +1,52 @@
+.history-page__lede {
+  max-width: 640px;
+  margin-bottom: var(--space-6);
+}
+
+.history-table-wrap {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.history-table th {
+  text-align: left;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  color: var(--ink-3);
+  padding: var(--space-4);
+  border-bottom: var(--hairline) solid var(--border);
+  white-space: nowrap;
+}
+
+.history-table td {
+  padding: var(--space-4);
+  border-bottom: var(--hairline) solid var(--border-soft);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.history-table tbody tr {
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+
+.history-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.history-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mono-cell {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
