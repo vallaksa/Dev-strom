@@ -8,8 +8,8 @@ operations use the ANONYMOUS_USER_ID.
 import logging
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.models.dto import AdviseRequest, CartographRequest, ExpandRequest, ExportRequest, IdeasRequest
 
@@ -62,6 +62,18 @@ except ImportError as exc:
     advise_repo_with_context = None
     get_advisor_run = None
     save_advisor_run = None
+
+# ── Async Job Runner (F4) ────────────────────────────────────────────────────
+# Same guarding rationale as the Cartographer/Advisor imports above: keep
+# app.api importable (and its async routes 503-able) even if
+# app.services.jobs isn't available yet.
+try:
+    from app.services.jobs import create_job, get_job, run_job
+except ImportError as exc:
+    logging.getLogger(__name__).error("Job runner module failed to import: %s", exc)
+    create_job = None
+    get_job = None
+    run_job = None
 
 # ── logging ───────────────────────────────────────────────────────────────────
 # Configure the root logger once, at app startup, with the level from typed
@@ -267,11 +279,35 @@ def _to_dict(obj) -> dict:
     return dict(obj)
 
 
+def _run_cartograph_pipeline(target: str, repo_url: str | None) -> dict:
+    """Run the cartograph+analyze pipeline and persist the result. Shared by
+    the sync and async paths of POST /cartograph — returns the same dict
+    shape that is the sync path's 200 response body.
+    """
+    project_graph = cartograph(target, repo_url=repo_url)
+    architecture_report = analyze_architecture(project_graph)
+    run_id = save_cartograph_run(project_graph, architecture_report)
+    return {
+        "run_id": run_id,
+        "project_graph": _to_dict(project_graph),
+        "architecture_report": _to_dict(architecture_report),
+    }
+
+
 @api.post("/cartograph")
-def post_cartograph(body: CartographRequest):
+def post_cartograph(
+    body: CartographRequest,
+    background_tasks: BackgroundTasks,
+    async_: bool = Query(False, alias="async"),
+):
     """Map a repository's architecture: build a ProjectGraph, analyze it into
-    an ArchitectureReport, persist both, and return them. Synchronous MVP —
-    the clone/parse/analyze pipeline runs inline on the request.
+    an ArchitectureReport, persist both, and return them.
+
+    By default this runs synchronously — the clone/parse/analyze pipeline
+    runs inline on the request, same as always. Pass `?async=true` to
+    instead schedule the pipeline as a background job and get back
+    `{job_id, status}` immediately (202); poll GET /jobs/{job_id} for the
+    result.
     """
     if not settings.openai_api_key:
         raise HTTPException(
@@ -288,23 +324,25 @@ def post_cartograph(body: CartographRequest):
         )
 
     target = body.repo_url or body.path
+
+    if async_:
+        if create_job is None or run_job is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Job runner module (app.services.jobs) is not available yet.",
+            )
+        job_id = create_job(kind="cartograph", params=body.model_dump())
+        background_tasks.add_task(run_job, job_id, lambda: _run_cartograph_pipeline(target, body.repo_url))
+        return JSONResponse(status_code=202, content={"job_id": job_id, "status": "pending"})
+
     try:
-        project_graph = cartograph(target, repo_url=body.repo_url)
-        architecture_report = analyze_architecture(project_graph)
+        return _run_cartograph_pipeline(target, body.repo_url)
     except Exception as exc:
         logger.exception("Cartograph pipeline failed for %r", target)
         raise HTTPException(
             status_code=500,
             detail=f"Cartograph failed: {exc}",
         ) from exc
-
-    run_id = save_cartograph_run(project_graph, architecture_report)
-
-    return {
-        "run_id": run_id,
-        "project_graph": _to_dict(project_graph),
-        "architecture_report": _to_dict(architecture_report),
-    }
 
 
 @api.get("/cartograph/{run_id}")
@@ -329,12 +367,41 @@ def get_cartograph_run_detail(run_id: str):
 
 # ── Improvement / Feature Advisor (F2) ───────────────────────────────────────
 
+def _run_advise_pipeline(repo_url: str | None, path: str | None, run_id_param: str | None) -> dict:
+    """Run the advisor pipeline and persist the result. Shared by the sync
+    and async paths of POST /advise — returns the same dict shape that is
+    the sync path's 200 response body.
+    """
+    result = advise_repo_with_context(
+        url_or_path=repo_url or path,
+        run_id=run_id_param,
+    )
+    run_id = save_advisor_run(
+        result["advisor_report"],
+        cartograph_run_id=result["cartograph_run_id"],
+        repo_url=result["repo_url"],
+    )
+    return {
+        "run_id": run_id,
+        "advisor_report": _to_dict(result["advisor_report"]),
+    }
+
+
 @api.post("/advise")
-def post_advise(body: AdviseRequest):
+def post_advise(
+    body: AdviseRequest,
+    background_tasks: BackgroundTasks,
+    async_: bool = Query(False, alias="async"),
+):
     """Produce a prioritized improvement roadmap for a repository, grounded in
     its actual code graph: either map+analyze it fresh (repo_url/path) or
     advise against an existing cartograph run (run_id). Persists and returns
-    the resulting AdvisorReport. Synchronous MVP, same as POST /cartograph.
+    the resulting AdvisorReport.
+
+    By default this runs synchronously, same as POST /cartograph. Pass
+    `?async=true` to instead schedule the pipeline as a background job and
+    get back `{job_id, status}` immediately (202); poll GET /jobs/{job_id}
+    for the result.
     """
     if not settings.openai_api_key:
         raise HTTPException(
@@ -350,11 +417,22 @@ def post_advise(body: AdviseRequest):
             ),
         )
 
-    try:
-        result = advise_repo_with_context(
-            url_or_path=body.repo_url or body.path,
-            run_id=body.run_id,
+    if async_:
+        if create_job is None or run_job is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Job runner module (app.services.jobs) is not available yet.",
+            )
+        job_id = create_job(kind="advise", params=body.model_dump())
+        background_tasks.add_task(
+            run_job,
+            job_id,
+            lambda: _run_advise_pipeline(body.repo_url, body.path, body.run_id),
         )
+        return JSONResponse(status_code=202, content={"job_id": job_id, "status": "pending"})
+
+    try:
+        return _run_advise_pipeline(body.repo_url, body.path, body.run_id)
     except Exception as exc:
         logger.exception(
             "Advisor pipeline failed for repo_url=%r path=%r run_id=%r",
@@ -364,17 +442,6 @@ def post_advise(body: AdviseRequest):
             status_code=500,
             detail=f"Advisor pipeline failed: {exc}",
         ) from exc
-
-    run_id = save_advisor_run(
-        result["advisor_report"],
-        cartograph_run_id=result["cartograph_run_id"],
-        repo_url=result["repo_url"],
-    )
-
-    return {
-        "run_id": run_id,
-        "advisor_report": _to_dict(result["advisor_report"]),
-    }
 
 
 @api.get("/advise/{run_id}")
@@ -393,6 +460,30 @@ def get_advise_run_detail(run_id: str):
         raise HTTPException(
             status_code=404,
             detail=f"Advisor run {run_id} not found.",
+        )
+    return record
+
+
+# ── Async Jobs (F4) ───────────────────────────────────────────────────────────
+
+@api.get("/jobs/{job_id}")
+def get_job_detail(job_id: str):
+    """Return the status/result of a background job scheduled via
+    `?async=true` on POST /cartograph or POST /advise: {job_id, kind,
+    status, params, result, error, created_at, updated_at}. 404 if it does
+    not exist.
+    """
+    if get_job is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Job runner module (app.services.jobs) is not available yet.",
+        )
+
+    record = get_job(job_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job {job_id} not found.",
         )
     return record
 

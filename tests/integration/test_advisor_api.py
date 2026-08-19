@@ -9,6 +9,13 @@ require a real clone/LLM/DB call.
 
 from app import api as api_module
 
+try:
+    from app.services.jobs import get_job as _get_job
+
+    _JOBS_AVAILABLE = True
+except ImportError:
+    _JOBS_AVAILABLE = False
+
 
 def _fake_advisor_report() -> dict:
     return {
@@ -176,6 +183,108 @@ def test_advise_pipeline_failure_returns_500(client, monkeypatch):
 
     resp = client.post("/advise", json={"repo_url": "https://github.com/example/repo"})
     assert resp.status_code == 500
+
+
+# ── POST /advise?async=true ──────────────────────────────────────────────────
+
+
+def test_advise_async_returns_202_with_job_id(client, monkeypatch):
+    def fake_pipeline(url_or_path=None, run_id=None):
+        return _fake_pipeline_result(repo_url="https://github.com/example/repo")
+
+    monkeypatch.setattr(api_module, "advise_repo_with_context", fake_pipeline)
+    monkeypatch.setattr(
+        api_module, "save_advisor_run",
+        lambda report, cartograph_run_id=None, repo_url=None: "advisor-run-async",
+    )
+
+    resp = client.post(
+        "/advise",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+
+    assert resp.status_code == 202
+    body = resp.json()
+    assert "job_id" in body
+    assert body["status"] == "pending"
+
+    if not _JOBS_AVAILABLE:
+        return  # app.services.jobs not present in this worktree - nothing more to assert
+    record = _get_job(body["job_id"])
+    assert record is not None
+    assert record["status"] == "done"
+    assert record["result"]["run_id"] == "advisor-run-async"
+    assert record["result"]["advisor_report"] == _fake_advisor_report()
+
+
+def test_advise_async_job_records_error_on_pipeline_failure(client, monkeypatch):
+    def boom(url_or_path=None, run_id=None):
+        raise RuntimeError("clone failed")
+
+    monkeypatch.setattr(api_module, "advise_repo_with_context", boom)
+    monkeypatch.setattr(
+        api_module, "save_advisor_run",
+        lambda report, cartograph_run_id=None, repo_url=None: "unused",
+    )
+
+    resp = client.post(
+        "/advise",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    if not _JOBS_AVAILABLE:
+        return
+    record = _get_job(job_id)
+    assert record is not None
+    assert record["status"] == "error"
+    assert "clone failed" in record["error"]
+
+
+def test_advise_async_missing_openai_key_returns_503(client, monkeypatch):
+    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+    resp = client.post(
+        "/advise",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+    assert resp.status_code == 503
+
+
+def test_advise_async_core_modules_unavailable_returns_503(client, monkeypatch):
+    monkeypatch.setattr(api_module, "advise_repo_with_context", None)
+    monkeypatch.setattr(api_module, "save_advisor_run", None)
+
+    resp = client.post(
+        "/advise",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+    assert resp.status_code == 503
+
+
+def test_advise_sync_default_unchanged_when_async_omitted(client, monkeypatch):
+    """No `async` query param at all still yields the original synchronous
+    200 behavior - default behavior must not change."""
+    def fake_pipeline(url_or_path=None, run_id=None):
+        return _fake_pipeline_result(repo_url="https://github.com/example/repo")
+
+    monkeypatch.setattr(api_module, "advise_repo_with_context", fake_pipeline)
+    monkeypatch.setattr(
+        api_module, "save_advisor_run",
+        lambda report, cartograph_run_id=None, repo_url=None: "advisor-run-sync",
+    )
+
+    resp = client.post("/advise", json={"repo_url": "https://github.com/example/repo"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["run_id"] == "advisor-run-sync"
+    assert body["advisor_report"] == _fake_advisor_report()
 
 
 # ── GET /advise/{run_id} ─────────────────────────────────────────────────────

@@ -11,6 +11,13 @@ call, whether or not feat/f1-core has landed in this worktree yet.
 
 from app import api as api_module
 
+try:
+    from app.services.jobs import get_job as _get_job
+
+    _JOBS_AVAILABLE = True
+except ImportError:
+    _JOBS_AVAILABLE = False
+
 
 def _fake_project_graph() -> dict:
     return {
@@ -130,6 +137,125 @@ def test_cartograph_pipeline_failure_returns_500(client, monkeypatch):
 
     resp = client.post("/cartograph", json={"repo_url": "https://github.com/example/repo"})
     assert resp.status_code == 500
+
+
+# ── POST /cartograph?async=true ──────────────────────────────────────────────
+
+
+def test_cartograph_async_returns_202_with_job_id(client, monkeypatch):
+    graph = _fake_project_graph()
+    report = _fake_architecture_report()
+
+    monkeypatch.setattr(api_module, "cartograph", lambda target, repo_url=None: graph)
+    monkeypatch.setattr(api_module, "analyze_architecture", lambda g: report)
+    monkeypatch.setattr(api_module, "save_cartograph_run", lambda pg, ar: "cartograph-run-async")
+
+    resp = client.post(
+        "/cartograph",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+
+    assert resp.status_code == 202
+    body = resp.json()
+    assert "job_id" in body
+    assert body["status"] == "pending"
+
+    # TestClient runs BackgroundTasks synchronously right after the response
+    # is generated, so the job should have already completed by the time we
+    # get here - if app.services.jobs is available in this worktree.
+    if not _JOBS_AVAILABLE:
+        return  # app.services.jobs not present in this worktree - nothing more to assert
+    record = _get_job(body["job_id"])
+    assert record is not None
+    assert record["status"] == "done"
+    assert record["result"]["run_id"] == "cartograph-run-async"
+    assert record["result"]["project_graph"] == graph
+    assert record["result"]["architecture_report"] == report
+
+
+def test_cartograph_async_job_records_error_on_pipeline_failure(client, monkeypatch):
+    def boom(target, repo_url=None):
+        raise RuntimeError("clone failed")
+
+    monkeypatch.setattr(api_module, "cartograph", boom)
+    monkeypatch.setattr(api_module, "analyze_architecture", lambda g: _fake_architecture_report())
+    monkeypatch.setattr(api_module, "save_cartograph_run", lambda pg, ar: "unused")
+
+    resp = client.post(
+        "/cartograph",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+
+    # Scheduling always succeeds with 202 - the failure surfaces in the job.
+    assert resp.status_code == 202
+    job_id = resp.json()["job_id"]
+
+    if not _JOBS_AVAILABLE:
+        return
+    record = _get_job(job_id)
+    assert record is not None
+    assert record["status"] == "error"
+    assert "clone failed" in record["error"]
+
+
+def test_cartograph_async_missing_openai_key_returns_503(client, monkeypatch):
+    """Guard checks stay synchronous even in async mode - the caller learns
+    immediately rather than polling a job that was doomed from the start."""
+    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+    resp = client.post(
+        "/cartograph",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+    assert resp.status_code == 503
+
+
+def test_cartograph_async_core_modules_unavailable_returns_503(client, monkeypatch):
+    monkeypatch.setattr(api_module, "cartograph", None)
+    monkeypatch.setattr(api_module, "analyze_architecture", None)
+    monkeypatch.setattr(api_module, "save_cartograph_run", None)
+
+    resp = client.post(
+        "/cartograph",
+        params={"async": "true"},
+        json={"repo_url": "https://github.com/example/repo"},
+    )
+    assert resp.status_code == 503
+
+
+def test_cartograph_sync_default_unchanged_when_async_omitted(client, monkeypatch):
+    """No `async` query param at all still yields the original synchronous
+    200 behavior - default behavior must not change."""
+    graph = _fake_project_graph()
+    report = _fake_architecture_report()
+
+    monkeypatch.setattr(api_module, "cartograph", lambda target, repo_url=None: graph)
+    monkeypatch.setattr(api_module, "analyze_architecture", lambda g: report)
+    monkeypatch.setattr(api_module, "save_cartograph_run", lambda pg, ar: "cartograph-run-sync")
+
+    resp = client.post("/cartograph", json={"repo_url": "https://github.com/example/repo"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["run_id"] == "cartograph-run-sync"
+    assert body["project_graph"] == graph
+    assert body["architecture_report"] == report
+
+
+# ── GET /jobs/{job_id} ────────────────────────────────────────────────────────
+
+
+def test_get_job_not_found_returns_404(client):
+    resp = client.get("/jobs/does-not-exist")
+    assert resp.status_code in (404, 503)
+    if not _JOBS_AVAILABLE:
+        # If app.services.jobs isn't importable, the route 503s instead -
+        # that's also correct behavior per the ImportError-guard pattern.
+        assert resp.status_code == 503
+    else:
+        assert resp.status_code == 404
 
 
 # ── GET /cartograph/{run_id} ─────────────────────────────────────────────────
