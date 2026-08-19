@@ -93,6 +93,15 @@ def test_cartograph_rejects_both_sources(client):
     assert resp.status_code == 422
 
 
+def test_cartograph_core_modules_are_wired_on_import():
+    """F1-core landed: pipeline/analyze/store must actually import, not stay None
+    behind the parallel-branch ImportError guard (that produced a 503 in prod)."""
+    assert api_module.cartograph is not None
+    assert api_module.analyze_architecture is not None
+    assert api_module.save_cartograph_run is not None
+    assert api_module.get_cartograph_run is not None
+
+
 def test_cartograph_missing_openai_key_returns_503(client, monkeypatch):
     monkeypatch.setattr(api_module.settings, "openai_api_key", None)
     resp = client.post("/cartograph", json={"repo_url": "https://github.com/example/repo"})

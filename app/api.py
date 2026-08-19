@@ -28,17 +28,19 @@ from app.services.run_service import (
 )
 
 # ── Project Cartographer (F1) ────────────────────────────────────────────────
-# app.cartographer.{analyze,pipeline,store} are owned by a parallel branch
-# (feat/f1-core) and may not exist yet in this worktree. Import them lazily
-# and guard with try/except so app.api stays importable (and every existing
-# route/test above keeps working) whether or not feat/f1-core has landed. The
-# /cartograph routes below check for None and return a clear 503 instead.
+# Persistence lives on CartographStore (PostgresJsonbStore.save / .get), not
+# module-level functions. Guard ImportError so app.api still loads if the
+# cartographer package is missing; routes return 503 when these are None.
 try:
     from app.cartographer.analyze import analyze_architecture
     from app.cartographer.pipeline import cartograph
-    from app.cartographer.store import get as get_cartograph_run
-    from app.cartographer.store import save as save_cartograph_run
-except ImportError:
+    from app.cartographer.store import PostgresJsonbStore
+
+    _cartograph_store = PostgresJsonbStore()
+    save_cartograph_run = _cartograph_store.save
+    get_cartograph_run = _cartograph_store.get
+except ImportError as exc:
+    logging.getLogger(__name__).error("Cartographer modules failed to import: %s", exc)
     analyze_architecture = None
     cartograph = None
     get_cartograph_run = None
