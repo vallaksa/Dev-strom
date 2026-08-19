@@ -77,3 +77,25 @@ def get_run_detail(run_id: str) -> dict:
     """Call GET /runs/{run_id} and return the full run including ideas."""
     return _get(f"/runs/{run_id}")
 
+
+# ── Project Cartographer (F1) ────────────────────────────────────────────────
+
+
+def post_cartograph(*, repo_url: str | None = None, path: str | None = None) -> dict:
+    """Call POST /cartograph and return {run_id, project_graph, architecture_report}.
+
+    Provide exactly one of repo_url or path. Uses a long timeout since the
+    clone/parse/analyze pipeline runs synchronously on the server.
+    """
+    payload: dict = {}
+    if repo_url and repo_url.strip():
+        payload["repo_url"] = repo_url.strip()
+    if path and path.strip():
+        payload["path"] = path.strip()
+    return _post("/cartograph", payload, timeout=300)
+
+
+def get_cartograph_run(run_id: str) -> dict:
+    """Call GET /cartograph/{run_id} and return {run_id, project_graph, architecture_report}."""
+    return _get(f"/cartograph/{run_id}")
+

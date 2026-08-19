@@ -5,6 +5,7 @@ can render idea cards with the same layout.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 import ui.api_client as api
 
@@ -102,3 +103,28 @@ def render_idea_card(
                 mime="text/markdown",
                 key=f"download_{run_id}_{index}",
             )
+
+
+# ── Project Cartographer (F1) ────────────────────────────────────────────────
+
+def render_mermaid(diagram: str, *, height: int = 520) -> None:
+    """Render a Mermaid diagram string client-side.
+
+    `st.markdown()` does not render mermaid code fences, so this embeds a
+    small self-contained HTML snippet (via `st.components.v1.html`) that
+    loads mermaid.js from a CDN and renders `diagram` in the browser.
+    """
+    if not diagram or not diagram.strip():
+        st.info("No architecture diagram was generated for this run.")
+        return
+
+    html = f"""
+    <div class="mermaid">
+{diagram}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{ startOnLoad: true, theme: "neutral", securityLevel: "loose" }});
+    </script>
+    """
+    components.html(html, height=height, scrolling=True)
