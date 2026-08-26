@@ -6,7 +6,13 @@ needs a live DB); here we only pin the JSONB -> summary-row shape, including
 graceful defaults on partial/legacy payloads.
 """
 
-from app.cartographer.analysis_store import summarize_analysis_row
+from app.cartographer.analysis_store import PostgresJsonbStore, summarize_analysis_row
+
+
+def test_get_malformed_run_id_returns_none_without_db():
+    """A non-UUID run_id must resolve to None (-> 404 at the route), not raise
+    a ValueError/500. Returns before any DB session is opened."""
+    assert PostgresJsonbStore().get("not-a-uuid") is None
 
 
 def _full_analysis() -> dict:

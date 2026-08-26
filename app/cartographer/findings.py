@@ -168,9 +168,16 @@ def _coerce_confidence(value: Any) -> float:
     return min(1.0, max(0.0, c))
 
 
-def _coerce_evidence(raw: Any) -> list[Evidence]:
+def _coerce_evidence(raw: Any, known_paths: frozenset[str] | None) -> list[Evidence]:
     """Build Evidence items from the LLM's list. `explanation` is required; an
-    evidence entry without one is skipped rather than fabricated."""
+    entry without one is skipped rather than fabricated.
+
+    Evidence-First grounding: when `known_paths` is provided (the set of real
+    repo-relative paths from the ProjectGraph), an entry whose `file` is NOT a
+    real repo path is treated as a fabricated citation and dropped — prompt
+    instructions alone can't stop the model inventing a plausible filename, so
+    we verify the locator against the actual graph. `known_paths=None` skips
+    this check (e.g. unit-testing the parser without a graph)."""
     out: list[Evidence] = []
     if not isinstance(raw, list):
         return out
@@ -180,13 +187,17 @@ def _coerce_evidence(raw: Any) -> list[Evidence]:
         explanation = item.get("explanation")
         if not (isinstance(explanation, str) and explanation.strip()):
             continue
+        file = _coerce_opt_str(item.get("file"))
+        if file is not None and known_paths is not None and file not in known_paths:
+            logger.warning("Dropping evidence citing unknown file %r (not in the repo graph).", file)
+            continue
         out.append(
             Evidence(
-                file=item.get("file") or None,
+                file=file,
                 line_start=_opt_pos_int(item.get("line_start")),
                 line_end=_opt_pos_int(item.get("line_end")),
-                symbol=item.get("symbol") or None,
-                snippet=item.get("snippet") or None,
+                symbol=_coerce_opt_str(item.get("symbol")),
+                snippet=_coerce_opt_str(item.get("snippet")),
                 explanation=explanation.strip(),
             )
         )
@@ -201,39 +212,64 @@ def _opt_pos_int(value: Any) -> int | None:
     return n if n >= 1 else None
 
 
-def _coerce_findings(raw: Any, repository_id: str) -> list[Finding]:
+def _coerce_str(value: Any) -> str:
+    """A stripped string, or "" for any non-string (a numeric/list description
+    must not crash coercion). Complements the top-level parse guard."""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _coerce_opt_str(value: Any) -> str | None:
+    """A non-empty stripped string, else None — for optional locator fields
+    (file/symbol/snippet) that the model might return as a non-string."""
+    return value.strip() or None if isinstance(value, str) and value.strip() else None
+
+
+def _coerce_findings(
+    raw: Any, repository_id: str, known_paths: frozenset[str] | None
+) -> tuple[list[Finding], dict[int, str]]:
+    """Coerce the raw findings list into Findings, returning the findings AND a
+    map from each finding's ORIGINAL index in `raw` to its id.
+
+    The index map is what keeps recommendation `finding_ref`s (which point at
+    the original array) correct even when some raw entries are skipped for
+    being non-dict/titleless — resolving through positions in the compressed
+    list would mis-link or drop references."""
     findings: list[Finding] = []
+    index_to_id: dict[int, str] = {}
     if not isinstance(raw, list):
-        return findings
+        return findings, index_to_id
     for i, item in enumerate(raw):
         if not isinstance(item, dict):
             continue
         title = item.get("title")
         if not (isinstance(title, str) and title.strip()):
             continue  # a finding with no title carries no signal
-        evidence = _coerce_evidence(item.get("evidence"))
+        evidence = _coerce_evidence(item.get("evidence"), known_paths)
         if not evidence:
             # Evidence-First: keep it (so nothing is silently lost) but flag it.
             logger.warning("Finding %r has no citable evidence; keeping but flagging.", title)
+        finding_id = f"finding-{i + 1}"
+        index_to_id[i] = finding_id
         findings.append(
             Finding(
-                id=f"finding-{i + 1}",
+                id=finding_id,
                 repository_id=repository_id,
                 category=_coerce_literal(item.get("category"), _VALID_CATEGORIES, _DEFAULT_CATEGORY),
                 title=title.strip(),
-                description=(item.get("description") or "").strip(),
+                description=_coerce_str(item.get("description")),
                 evidence=evidence,
                 confidence=_coerce_confidence(item.get("confidence")),
                 severity=_coerce_literal(item.get("severity"), _VALID_SEVERITIES, _DEFAULT_SEVERITY),
             )
         )
-    return findings
+    return findings, index_to_id
 
 
-def _coerce_recommendations(raw: Any, finding_ids: list[str]) -> list[Recommendation]:
-    """Build Recommendations, resolving each `finding_ref` (0-based index into
-    the findings array) to the corresponding finding id. An out-of-range or
-    missing ref yields a cross-cutting recommendation (finding_id=None)."""
+def _coerce_recommendations(raw: Any, finding_index_to_id: dict[int, str]) -> list[Recommendation]:
+    """Build Recommendations, resolving each `finding_ref` (a 0-based index into
+    the ORIGINAL findings array) to the corresponding finding id via
+    `finding_index_to_id`. A ref to a skipped/absent finding yields a
+    cross-cutting recommendation (finding_id=None)."""
     recs: list[Recommendation] = []
     if not isinstance(raw, list):
         return recs
@@ -244,16 +280,14 @@ def _coerce_recommendations(raw: Any, finding_ids: list[str]) -> list[Recommenda
         if not (isinstance(title, str) and title.strip()):
             continue
         ref = item.get("finding_ref")
-        finding_id: str | None = None
-        if isinstance(ref, int) and 0 <= ref < len(finding_ids):
-            finding_id = finding_ids[ref]
+        finding_id = finding_index_to_id.get(ref) if isinstance(ref, int) else None
         recs.append(
             Recommendation(
                 id=f"rec-{i + 1}",
                 finding_id=finding_id,
                 type=_coerce_literal(item.get("type"), _VALID_REC_TYPES, _DEFAULT_REC_TYPE),
                 title=title.strip(),
-                description=(item.get("description") or "").strip(),
+                description=_coerce_str(item.get("description")),
                 impact=_coerce_literal(item.get("impact"), _VALID_LEVELS, _DEFAULT_LEVEL),
                 effort=_coerce_literal(item.get("effort"), _VALID_LEVELS, _DEFAULT_LEVEL),
                 priority=_opt_pos_int(item.get("priority")) or (i + 1),
@@ -278,13 +312,19 @@ def _minimal_analysis(repository: Repository, note: str) -> Analysis:
     )
 
 
-def parse_analysis(raw: str, repository: Repository) -> Analysis:
+def parse_analysis(
+    raw: str, repository: Repository, known_paths: frozenset[str] | None = None
+) -> Analysis:
     """Parse an agent's raw text into a validated `Analysis`, grounding every
-    finding in `repository`. Strips markdown fences first; on any failure
-    returns a `_minimal_analysis` (status="failed") — never raises.
+    finding in `repository`. Strips markdown fences first; on ANY failure —
+    malformed JSON, an unexpected field type, or model-construction error —
+    returns a `_minimal_analysis` (status="failed"). Never raises, so a bad
+    model response can't turn a synchronous /analyze into a 500.
 
     `repository_id` on findings is always set from `repository` here (never
-    trusted from the model), keeping the evidence chain authoritative.
+    trusted from the model). `known_paths`, when given, is the set of real
+    repo-relative paths used to drop fabricated evidence citations (see
+    `_coerce_evidence`).
     """
     cleaned = _strip_markdown_fences(raw)
     try:
@@ -295,18 +335,25 @@ def parse_analysis(raw: str, repository: Repository) -> Analysis:
         logger.warning("Failed to parse Analysis JSON: %s", exc)
         return _minimal_analysis(repository, f"Analysis output could not be parsed: {exc}")
 
-    findings = _coerce_findings(data.get("findings"), repository.id)
-    recommendations = _coerce_recommendations(data.get("recommendations"), [f.id for f in findings])
-    summary = data.get("summary")
-    return Analysis(
-        id=str(uuid.uuid4()),
-        repository=repository,
-        summary=summary.strip() if isinstance(summary, str) else "",
-        mermaid=_coerce_mermaid(data.get("mermaid")),
-        findings=findings,
-        recommendations=recommendations,
-        status="complete",
-    )
+    # Coercion + model construction are guarded too: the coercers are defensive,
+    # but a pathological payload (e.g. an unexpected type slipping through) must
+    # still degrade to a failed Analysis rather than escape as a 500.
+    try:
+        findings, index_to_id = _coerce_findings(data.get("findings"), repository.id, known_paths)
+        recommendations = _coerce_recommendations(data.get("recommendations"), index_to_id)
+        summary = data.get("summary")
+        return Analysis(
+            id=str(uuid.uuid4()),
+            repository=repository,
+            summary=summary.strip() if isinstance(summary, str) else "",
+            mermaid=_coerce_mermaid(data.get("mermaid")),
+            findings=findings,
+            recommendations=recommendations,
+            status="complete",
+        )
+    except Exception as exc:
+        logger.warning("Failed to build Analysis from parsed JSON: %s", exc)
+        return _minimal_analysis(repository, f"Analysis output could not be parsed: {exc}")
 
 
 def _coerce_mermaid(value: Any) -> str | None:
@@ -350,4 +397,19 @@ def analyze_findings(graph: Any, repository: Repository) -> Analysis:
         return _minimal_analysis(repository, f"Analysis failed: {exc}")
 
     raw = _extract_last_content(result)
-    return parse_analysis(raw, repository)
+    # Empty path set (degenerate/empty graph) -> None -> skip file validation,
+    # since there's no basis to distinguish real from fabricated paths.
+    return parse_analysis(raw, repository, known_paths=_graph_file_paths(graph) or None)
+
+
+def _graph_file_paths(graph: Any) -> frozenset[str]:
+    """The set of real repo-relative paths in the ProjectGraph, used to reject
+    fabricated evidence citations. Reads nodes whether the graph is a pydantic
+    ProjectGraph or a plain dict (tests pass dicts)."""
+    nodes = graph.get("nodes", []) if isinstance(graph, dict) else getattr(graph, "nodes", [])
+    paths: set[str] = set()
+    for n in nodes or []:
+        path = n.get("path") if isinstance(n, dict) else getattr(n, "path", None)
+        if isinstance(path, str) and path:
+            paths.add(path)
+    return frozenset(paths)

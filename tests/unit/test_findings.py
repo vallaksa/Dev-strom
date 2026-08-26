@@ -158,6 +158,81 @@ def test_parse_analysis_mermaid_strips_fences_and_blank_is_none():
     assert findings.parse_analysis(json.dumps(missing), _repo()).mermaid is None
 
 
+def test_parse_analysis_drops_evidence_citing_unknown_file():
+    """Evidence-First: a fabricated file citation (not in the repo graph) is
+    dropped when known_paths is supplied; a real one is kept."""
+    data = {
+        "summary": "s",
+        "findings": [
+            {"category": "design", "title": "T", "description": "d", "evidence": [
+                {"file": "app/real.py", "explanation": "real citation"},
+                {"file": "app/made_up.py", "explanation": "fabricated citation"},
+                {"explanation": "file-less observation"},
+            ]}
+        ],
+        "recommendations": [],
+    }
+    analysis = findings.parse_analysis(json.dumps(data), _repo(), known_paths=frozenset({"app/real.py"}))
+    ev = analysis.findings[0].evidence
+    files = [e.file for e in ev]
+    assert "app/real.py" in files          # real path kept
+    assert "app/made_up.py" not in files   # fabricated path dropped
+    assert None in files                   # file-less evidence kept
+
+
+def test_parse_analysis_finding_ref_survives_skipped_findings():
+    """A titleless finding in the middle is skipped, but a recommendation
+    referring to a LATER finding by original index still links correctly."""
+    data = {
+        "summary": "s",
+        "findings": [
+            {"category": "design", "title": "First", "description": "d"},
+            {"category": "design", "description": "no title -> skipped"},
+            {"category": "design", "title": "Third", "description": "d"},
+        ],
+        "recommendations": [
+            {"type": "engineering", "title": "targets third", "finding_ref": 2},
+            {"type": "engineering", "title": "targets skipped", "finding_ref": 1},
+        ],
+    }
+    analysis = findings.parse_analysis(json.dumps(data), _repo())
+    ids = {f.id for f in analysis.findings}
+    assert ids == {"finding-1", "finding-3"}  # original indexes preserved in ids
+    recs = analysis.recommendations
+    assert recs[0].finding_id == "finding-3"  # ref=2 -> original index 2's finding
+    assert recs[1].finding_id is None         # ref=1 was skipped -> cross-cutting
+
+
+def test_parse_analysis_nonstring_fields_do_not_crash():
+    """Unexpected field types (numeric description, list-valued file) coerce
+    defensively rather than raising a 500."""
+    data = {
+        "summary": "s",
+        "findings": [
+            {"category": "design", "title": "T", "description": 42,
+             "evidence": [{"file": ["not", "a", "string"], "explanation": "x"}]}
+        ],
+        "recommendations": [{"type": "engineering", "title": "R", "description": 99}],
+    }
+    analysis = findings.parse_analysis(json.dumps(data), _repo())
+    assert analysis.status == "complete"
+    assert analysis.findings[0].description == ""      # numeric -> ""
+    assert analysis.findings[0].evidence[0].file is None  # list -> None
+    assert analysis.recommendations[0].description == ""
+
+
+def test_parse_analysis_build_error_degrades_to_failed(monkeypatch):
+    """If coercion/model construction raises despite the defensive coercers,
+    parse_analysis must return a failed Analysis, not propagate a 500."""
+    def boom(*args, **kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(findings, "_coerce_findings", boom)
+    analysis = findings.parse_analysis(json.dumps({"summary": "s", "findings": [], "recommendations": []}), _repo())
+    assert analysis.status == "failed"
+    assert "could not be parsed" in analysis.summary
+
+
 def test_parse_analysis_garbage_returns_failed_minimal_analysis():
     analysis = findings.parse_analysis("not json at all {{{", _repo())
     assert analysis.status == "failed"
@@ -195,6 +270,27 @@ def test_analyze_findings_happy_path_uses_mocked_agent(monkeypatch):
     assert analysis.status == "complete"
     assert len(analysis.findings) == 2
     assert analysis.recommendations[0].finding_id == analysis.findings[0].id
+
+
+def test_analyze_findings_grounds_evidence_in_graph_paths(monkeypatch):
+    """End to end (mocked agent): evidence citing a file that exists in the
+    graph is kept; one citing a nonexistent file is dropped."""
+    raw = json.dumps({
+        "summary": "s",
+        "findings": [{"category": "design", "title": "T", "description": "d", "evidence": [
+            {"file": "app/main.py", "explanation": "real"},
+            {"file": "app/ghost.py", "explanation": "fabricated"},
+        ]}],
+        "recommendations": [],
+    })
+    monkeypatch.setattr(findings, "_invoke_with_fallback",
+                        lambda get_agent, messages: {"messages": [_FakeMessage(raw)]})
+
+    graph = {"nodes": [{"id": "m", "type": "module", "label": "main", "path": "app/main.py"}], "edges": []}
+    analysis = findings.analyze_findings(graph, _repo())
+
+    files = [e.file for e in analysis.findings[0].evidence]
+    assert files == ["app/main.py"]  # ghost.py dropped as not in the graph
 
 
 def test_analyze_findings_agent_failure_returns_failed_analysis(monkeypatch):

@@ -75,8 +75,14 @@ class PostgresJsonbStore(AnalysisStore):
         return run_id
 
     def get(self, run_id: str) -> dict | None:
+        try:
+            key = uuid.UUID(run_id)
+        except ValueError:
+            # A malformed (non-UUID) id is simply "not found", not a 500 — the
+            # /analyze/{run_id} route relies on None here to return its 404.
+            return None
         with get_session() as session:
-            row = session.get(AnalysisRun, uuid.UUID(run_id))
+            row = session.get(AnalysisRun, key)
             if row is None:
                 return None
             return {
