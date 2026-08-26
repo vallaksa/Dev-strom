@@ -40,11 +40,20 @@ class ProjectIdea(BaseModel):
     why_it_fits: list[str] = Field(..., description="Short bullets per tech in the stack")
     real_world_value: str = Field(..., description="One sentence on real-world value")
     implementation_plan: list[str] = Field(..., description="3–5 high-level implementation steps")
-    # Orion-2 rich idea card fields (additive; absent on older runs)
-    engineering_challenges: list[str] = Field(default_factory=list)
-    architectural_intent: str | None = None
-    tradeoffs: list[str] = Field(default_factory=list)
-    business_value: str | None = None
+    # ── Engineering-context enrichment (optional; graceful degradation) ────────
+    # Added so idea cards can "teach engineering while generating ideas" (plan
+    # §3). Optional with defaults so older persisted ideas and the strict
+    # required-field validation both keep working.
+    business_value: str = Field(default="", description="Business impact; UI falls back to real_world_value")
+    engineering_challenges: list[str] = Field(
+        default_factory=list, description="The hard engineering problems this project surfaces"
+    )
+    architectural_intent: str = Field(
+        default="", description="Why the suggested architecture is shaped this way"
+    )
+    tradeoffs: list[str] = Field(
+        default_factory=list, description="Key design tradeoffs the builder will weigh"
+    )
 
 
 class IdeasResponse(BaseModel):
@@ -210,5 +219,9 @@ class Analysis(BaseModel):
     summary: str = Field(default="", description="System overview / what this system does")
     findings: list[Finding] = Field(default_factory=list)
     recommendations: list[Recommendation] = Field(default_factory=list)
+    mermaid: str | None = Field(
+        default=None,
+        description="Optional component-level architecture diagram (Mermaid flowchart source)",
+    )
     status: Literal["pending", "complete", "failed"] = "complete"
     created_at: datetime = Field(default_factory=_utcnow)

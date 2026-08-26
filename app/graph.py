@@ -32,6 +32,7 @@ class DevStromStateRequired(TypedDict):
 
 
 class DevStromStateOptional(TypedDict, total=False):
+    intent: str
     domain: str
     level: str
     enable_multi_query: bool
@@ -153,15 +154,15 @@ Follow these instructions exactly and obey all guardrails:
         "Step 2: Core Logic...",
         "Step 3: Integration/Polish..."
       ],
+      "business_value": "One sentence on the concrete business/real-world value this delivers.",
       "engineering_challenges": [
-        "Concrete engineering problem this project forces you to solve (e.g. idempotency).",
-        "Another concrete challenge..."
+        "A hard engineering problem this project forces you to solve (e.g. idempotency).",
+        "Another distinct challenge (e.g. event ordering, backpressure)..."
       ],
-      "architectural_intent": "1-2 sentences on why the architecture would be shaped this way.",
+      "architectural_intent": "1-2 sentences on why the suggested architecture is shaped this way.",
       "tradeoffs": [
-        "What you gain vs. give up with this design."
-      ],
-      "business_value": "Business/real-world payoff (may echo real_world_value; keep concrete)."
+        "A key design tradeoff the builder must weigh (e.g. eventual consistency vs latency)."
+      ]
     }
   ]
 }
@@ -172,10 +173,10 @@ Follow these instructions exactly and obey all guardrails:
    - "why_it_fits": Each string MUST start with the Tech Name followed by a colon. Do not list generic benefits; link the tech to the specific domain problem. Aim for one bullet per key tech.
    - "real_world_value": Focus on business value (cost, speed, accuracy, risk), not just coding practice.
    - "implementation_plan": 3–5 high-level, actionable steps that a developer could realistically follow.
-   - "engineering_challenges": 2–4 concrete engineering problems (not soft skills) the builder must confront.
-   - "architectural_intent": Why this shape of system — the design reasoning, not a restatement of the title.
-   - "tradeoffs": 1–3 honest tradeoffs the builder accepts with this design.
-   - "business_value": Concrete payoff; may align with real_world_value but should stay specific.
+   - "business_value": One sentence on concrete real-world value; may restate real_world_value more specifically.
+   - "engineering_challenges": 2–4 specific, non-generic engineering problems the project surfaces (idempotency, event ordering, retry semantics, distributed state, etc.). The goal is to TEACH engineering, not just list features.
+   - "architectural_intent": 1–2 sentences explaining WHY the architecture is shaped this way (the design reasoning), not just what it is.
+   - "tradeoffs": 1–3 concrete tradeoffs implied by that architecture (e.g. eventual consistency, operational complexity, cost).
 
 5. DOMAIN BIAS:
    - If a Domain/Company is provided (e.g. Walmart, Fintech), use terminology and architectural patterns specific to that industry (e.g. "SCD Type 2" for data warehousing, "circuit breakers" for microservices).
@@ -231,10 +232,10 @@ _EMPTY_IDEA: dict = {
     "why_it_fits": [],
     "real_world_value": "",
     "implementation_plan": [],
+    "business_value": "",
     "engineering_challenges": [],
-    "architectural_intent": None,
+    "architectural_intent": "",
     "tradeoffs": [],
-    "business_value": None,
 }
 
 
@@ -270,6 +271,14 @@ def generate_ideas(state: DevStromState) -> dict:
         f"Tech stack: {tech_stack}",
         f"user_id: {ANONYMOUS_USER_ID}",
     ]
+    # Natural-language intent (plan §2): when the user described what they want
+    # in prose, hand it to the model as the primary ask and let it infer the
+    # technologies/domain/complexity itself, rather than forcing structured fields.
+    if intent := state.get("intent"):
+        parts.append(
+            f"User's request (natural language): {intent}\n"
+            "Infer the appropriate technologies, domain, and complexity from this request."
+        )
     if domain := state.get("domain"):
         parts.append(f"Domain (bias ideas toward): {domain}")
     if level := state.get("level"):

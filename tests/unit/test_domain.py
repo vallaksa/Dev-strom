@@ -118,6 +118,7 @@ def test_analysis_aggregates_repository_findings_recommendations():
                                         title="Add tests", description="…")],
     )
     assert analysis.status == "complete"
+    assert analysis.mermaid is None  # optional architecture diagram, absent by default
     assert analysis.repository.id == "repo-1"
     assert analysis.findings[0].repository_id == repo.id
     # round-trips through JSON mode cleanly (datetime -> isoformat)
