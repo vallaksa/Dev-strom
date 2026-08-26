@@ -40,6 +40,12 @@ export function IdeaCard({ idea, runId }: { idea: Idea; runId: string }) {
     }
   };
 
+  // business_value may arrive as "" (not just absent) — treat blank as missing
+  // and fall back to real_world_value.
+  const value = idea.business_value?.trim() ? idea.business_value : idea.real_world_value;
+  const hasChallenges = (idea.engineering_challenges?.length ?? 0) > 0;
+  const hasTradeoffs = (idea.tradeoffs?.length ?? 0) > 0;
+
   return (
     <article className="idea-card card">
       <div className="idea-card__head">
@@ -47,18 +53,47 @@ export function IdeaCard({ idea, runId }: { idea: Idea; runId: string }) {
       </div>
       <h3>{idea.name}</h3>
 
-      <p className="idea-card__label mono-label">Problem</p>
+      <p className="idea-card__label mono-label">Real-World Problem</p>
       <p>{idea.problem_statement}</p>
 
-      <p className="idea-card__label mono-label">Why It Fits</p>
+      <p className="idea-card__label mono-label">Why It's Interesting</p>
       <ul>
         {idea.why_it_fits.map((point, i) => (
           <li key={i}>{point}</li>
         ))}
       </ul>
 
+      {hasChallenges && (
+        <>
+          <p className="idea-card__label mono-label accent">Engineering Challenges</p>
+          <ul className="idea-card__challenges">
+            {idea.engineering_challenges!.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {idea.architectural_intent && (
+        <div className="idea-card__intent">
+          <p className="idea-card__label mono-label accent">Architectural Intent</p>
+          <p>{idea.architectural_intent}</p>
+        </div>
+      )}
+
+      {hasTradeoffs && (
+        <>
+          <p className="idea-card__label mono-label">Tradeoffs</p>
+          <ul className="idea-card__tradeoffs">
+            {idea.tradeoffs!.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <p className="idea-card__label mono-label">Real-World Value</p>
-      <p>{idea.real_world_value}</p>
+      <p>{value}</p>
 
       <p className="idea-card__label mono-label">Implementation Plan</p>
       <ol>
@@ -85,7 +120,7 @@ export function IdeaCard({ idea, runId }: { idea: Idea; runId: string }) {
 
       <div className="idea-card__actions">
         <button type="button" className="btn btn-secondary btn-sm" onClick={handleExpand}>
-          {expanded ? "Collapse" : "Expand"}
+          {expanded ? "Collapse" : "Deepen Plan"}
         </button>
         <button
           type="button"
