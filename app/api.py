@@ -124,7 +124,15 @@ def post_ideas(body: IdeasRequest):
             detail="Set OPENAI_API_KEY and TAVILY_API_KEY in .env",
         )
 
-    inputs = {"tech_stack": body.tech_stack, "count": body.count}
+    intent = body.intent.strip() if body.intent and body.intent.strip() else None
+    # `tech_stack` may be omitted when an NL `intent` is given (validated by
+    # IdeasRequest). Fall back to the intent text so web search + storage still
+    # have a query, and pass the raw intent through so the graph can reason on it.
+    effective_stack = (body.tech_stack.strip() if body.tech_stack and body.tech_stack.strip() else intent) or ""
+
+    inputs = {"tech_stack": effective_stack, "count": body.count}
+    if intent:
+        inputs["intent"] = intent
     if body.domain and body.domain.strip():
         inputs["domain"] = body.domain.strip()
     if body.level and body.level.strip():
@@ -162,7 +170,7 @@ def post_ideas(body: IdeasRequest):
 
     # Persist run to database
     run_id = save_run(
-        tech_stack=body.tech_stack,
+        tech_stack=effective_stack,
         domain=inputs.get("domain"),
         level=inputs.get("level"),
         count=body.count,

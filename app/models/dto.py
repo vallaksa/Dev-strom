@@ -9,11 +9,21 @@ from pydantic import BaseModel, Field, model_validator
 # ── Requests ──────────────────────────────────────────────────────────────────
 
 class IdeasRequest(BaseModel):
-    tech_stack: str
+    # Either a natural-language `intent` (the new NL-first input, plan §2) or a
+    # structured `tech_stack` — at least one is required. When only `intent` is
+    # given, the graph infers the stack/domain/complexity from it.
+    intent: str | None = Field(default=None, description="Natural-language description of what to build")
+    tech_stack: str | None = None
     domain: str | None = None
     level: str | None = None
     enable_multi_query: bool = False
     count: int = Field(default=3, ge=1, le=5)
+
+    @model_validator(mode="after")
+    def _requires_intent_or_tech_stack(self) -> "IdeasRequest":
+        if not (self.intent and self.intent.strip()) and not (self.tech_stack and self.tech_stack.strip()):
+            raise ValueError("Provide at least one of 'intent' or 'tech_stack'.")
+        return self
 
 
 class ExpandRequest(BaseModel):
