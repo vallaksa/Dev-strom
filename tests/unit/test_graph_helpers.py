@@ -100,3 +100,27 @@ def test_parse_ideas_under_generation_returns_all_parsed():
     raw = json.dumps({"ideas": [_valid_idea(1)]})
     result = _parse_ideas(raw, expected_count=3)
     assert len(result) == 1
+
+
+def test_parse_ideas_preserves_engineering_enrichment_fields():
+    """The new optional idea-card fields round-trip through validation."""
+    idea = {
+        **_valid_idea(1),
+        "business_value": "Cuts failed-payment revenue loss.",
+        "engineering_challenges": ["Idempotency", "Event ordering"],
+        "architectural_intent": "Event-driven to decouple retries from the request path.",
+        "tradeoffs": ["Eventual consistency"],
+    }
+    result = _parse_ideas(json.dumps({"ideas": [idea]}), expected_count=1)
+    assert result[0]["engineering_challenges"] == ["Idempotency", "Event ordering"]
+    assert result[0]["architectural_intent"].startswith("Event-driven")
+    assert result[0]["tradeoffs"] == ["Eventual consistency"]
+
+
+def test_parse_ideas_defaults_enrichment_fields_when_absent():
+    """Old-shape ideas (no enrichment fields) still validate, defaulting the
+    new fields — graceful degradation for older payloads."""
+    result = _parse_ideas(json.dumps({"ideas": [_valid_idea(1)]}), expected_count=1)
+    assert result[0]["business_value"] == ""
+    assert result[0]["engineering_challenges"] == []
+    assert result[0]["tradeoffs"] == []

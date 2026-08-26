@@ -37,6 +37,41 @@ def test_ideas_happy_path_returns_run_id_and_n_ideas(client, monkeypatch):
     assert body["ideas"][0]["name"] == "Idea 1"
 
 
+class _CapturingGraphApp:
+    """FakeGraphApp variant that records the inputs it was invoked with."""
+
+    def __init__(self, result: dict):
+        self._result = result
+        self.inputs: dict | None = None
+
+    def invoke(self, inputs: dict) -> dict:
+        self.inputs = inputs
+        return self._result
+
+
+def test_ideas_intent_only_infers_effective_stack_and_passes_intent(client, monkeypatch):
+    intent = "A challenging event-driven payments backend that pushes distributed systems skills."
+    fake_graph = _CapturingGraphApp({"ideas": [make_idea(1)], "web_context": "ctx"})
+    saved = {}
+    monkeypatch.setattr(api_module, "graph_app", fake_graph)
+    monkeypatch.setattr(api_module, "save_run", lambda **kwargs: saved.update(kwargs) or "run-intent")
+
+    resp = client.post("/ideas", json={"intent": intent, "count": 1})
+
+    assert resp.status_code == 200
+    assert resp.json()["run_id"] == "run-intent"
+    # intent is passed through to the graph, and also backfills tech_stack
+    assert fake_graph.inputs["intent"] == intent
+    assert fake_graph.inputs["tech_stack"] == intent
+    # persistence records the effective stack (the intent text), not None
+    assert saved["tech_stack"] == intent
+
+
+def test_ideas_requires_intent_or_tech_stack_returns_422(client):
+    resp = client.post("/ideas", json={"count": 1})
+    assert resp.status_code == 422
+
+
 def test_ideas_missing_openai_key_returns_503(client, monkeypatch):
     # The 503 guard reads app.config.settings (a cached pydantic-settings
     # singleton), not os.environ directly, so patch the settings field
