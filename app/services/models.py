@@ -169,6 +169,35 @@ class AdvisorRun(Base):
     )
 
 
+# ── analysis_runs (Evidence-First Repository Intelligence) ──────────────────────
+class AnalysisRun(Base):
+    """One row per evidence-first repository analysis (app.cartographer.pipeline
+    .analyze_repository_with_graph): the domain `Analysis` (Repository +
+    Findings + Recommendations) plus the structural `ProjectGraph` it was
+    derived from, both as JSONB.
+
+    `analysis` is `app.models.domain.Analysis.model_dump()`; `project_graph`
+    is `app.cartographer.model.ProjectGraph.model_dump()` (nullable — kept so
+    the Architecture tab can reload a past run's wiring diagram). As with
+    CartographRun / AdvisorRun, this ORM layer intentionally does not import
+    those pydantic models, keeping persistence decoupled from their shape.
+    """
+
+    __tablename__ = "analysis_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    repo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    analysis: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    project_graph: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("now()"),
+    )
+
+
 # ── jobs (F4-surface: in-process background job runner) ─────────────────────────
 class Job(Base):
     """One row per background job (e.g. an async /cartograph or /advise run).

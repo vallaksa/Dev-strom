@@ -11,7 +11,14 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from app.models.dto import AdviseRequest, CartographRequest, ExpandRequest, ExportRequest, IdeasRequest
+from app.models.dto import (
+    AdviseRequest,
+    AnalyzeRequest,
+    CartographRequest,
+    ExpandRequest,
+    ExportRequest,
+    IdeasRequest,
+)
 
 load_dotenv()
 
@@ -63,6 +70,23 @@ except ImportError as exc:
     advise_repo_with_context = None
     get_advisor_run = None
     save_advisor_run = None
+
+# ── Repository Intelligence / Analysis (Evidence-First) ──────────────────────
+# Same guarding rationale as the Cartographer/Advisor imports above: keep
+# app.api importable (and the /analyze routes 503-able) even if the analyzer
+# pipeline/store fails to import, and let tests monkeypatch these names.
+try:
+    from app.cartographer.analysis_store import PostgresJsonbStore as AnalysisPostgresJsonbStore
+    from app.cartographer.pipeline import analyze_repository_with_graph
+
+    _analysis_store = AnalysisPostgresJsonbStore()
+    save_analysis_run = _analysis_store.save
+    get_analysis_run = _analysis_store.get
+except ImportError as exc:
+    logging.getLogger(__name__).error("Analyzer modules failed to import: %s", exc)
+    analyze_repository_with_graph = None
+    get_analysis_run = None
+    save_analysis_run = None
 
 # ── Async Job Runner (F4) ────────────────────────────────────────────────────
 # Same guarding rationale as the Cartographer/Advisor imports above: keep
@@ -463,6 +487,88 @@ def get_advise_run_detail(run_id: str):
             detail=f"Advisor run {run_id} not found.",
         )
     return record
+
+
+# ── Repository Intelligence / Analysis (Evidence-First) ──────────────────────
+
+def _analysis_response(run_id: str, analysis: dict, graph: dict | None) -> dict:
+    """The flat /analyze response body: the domain Analysis at top level (its
+    `mermaid` architecture diagram included, may be null), plus the persisted
+    `run_id` (used by GET /analyze/{run_id}) and the `graph` extra (the
+    structural ProjectGraph, for a UI that renders the wiring natively)."""
+    return {"run_id": run_id, **analysis, "graph": graph}
+
+
+def _run_analyze_pipeline(target: str, repo_url: str | None) -> dict:
+    """Run the evidence-first analysis pipeline and persist the result. Shared
+    by the sync and async paths of POST /analyze — returns the same dict shape
+    that is the sync path's 200 response body."""
+    analysis, project_graph = analyze_repository_with_graph(target, repo_url=repo_url)
+    graph_dict = _to_dict(project_graph)
+    run_id = save_analysis_run(analysis, project_graph=graph_dict, repo_url=repo_url)
+    return _analysis_response(run_id, _to_dict(analysis), graph_dict)
+
+
+@api.post("/analyze")
+def post_analyze(
+    body: AnalyzeRequest,
+    background_tasks: BackgroundTasks,
+    async_: bool = Query(False, alias="async"),
+):
+    """Produce an evidence-first Repository Intelligence Analysis: ingest the
+    repo deterministically, run the analysis, and return the domain `Analysis`
+    (Repository + Findings + Recommendations) plus the structural `graph`.
+
+    Runs synchronously by default, same as POST /cartograph. Pass
+    `?async=true` to schedule it as a background job and get back
+    `{job_id, status}` immediately (202); poll GET /jobs/{job_id}.
+    """
+    if not settings.openai_api_key:
+        raise HTTPException(status_code=503, detail="Set OPENAI_API_KEY in .env")
+    if analyze_repository_with_graph is None or save_analysis_run is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Analyzer core modules (app.cartographer.pipeline/analysis_store) "
+                "are not available yet."
+            ),
+        )
+
+    target = body.repo_url or body.path
+
+    if async_:
+        if create_job is None or run_job is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Job runner module (app.services.jobs) is not available yet.",
+            )
+        job_id = create_job(kind="analyze", params=body.model_dump())
+        background_tasks.add_task(run_job, job_id, lambda: _run_analyze_pipeline(target, body.repo_url))
+        return JSONResponse(status_code=202, content={"job_id": job_id, "status": "pending"})
+
+    try:
+        return _run_analyze_pipeline(target, body.repo_url)
+    except Exception as exc:
+        logger.exception("Analyze pipeline failed for %r", target)
+        raise HTTPException(status_code=500, detail=f"Analyze failed: {exc}") from exc
+
+
+@api.get("/analyze/{run_id}")
+def get_analyze_run_detail(run_id: str):
+    """Return a previously persisted analysis run in the same flat shape as
+    POST /analyze (Analysis fields + `graph` + `mermaid`), so the UI's History
+    can reload a past run. 404 if it does not exist.
+    """
+    if get_analysis_run is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Analyzer core modules (app.cartographer.analysis_store) are not available yet.",
+        )
+
+    record = get_analysis_run(run_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Analysis run {run_id} not found.")
+    return _analysis_response(record["run_id"], record["analysis"], record.get("project_graph"))
 
 
 # ── Async Jobs (F4) ───────────────────────────────────────────────────────────
