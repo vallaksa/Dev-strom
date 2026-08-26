@@ -1,8 +1,8 @@
 import { apiClient } from "./client";
 import { demoDelay } from "./demo";
-import { sampleAnalysis } from "../fixtures/analysis";
+import { sampleAnalysis, sampleAnalysisHistory } from "../fixtures/analysis";
 import { isDemoMode } from "../lib/demoMode";
-import type { Analysis, AnalyzeRequest } from "./types";
+import type { Analysis, AnalysisHistoryResponse, AnalyzeRequest } from "./types";
 
 /**
  * POST /analyze — deterministic ingestion + evidence-first analysis of a repo.
@@ -27,10 +27,22 @@ export async function postAnalyze(body: AnalyzeRequest): Promise<Analysis> {
   return apiClient.post<Analysis>("/analyze", body);
 }
 
-/** GET /analyze/{id} — reload a previously computed Analysis (e.g. from History). */
-export async function getAnalysis(id: string): Promise<Analysis> {
+/** GET /analyze/{run_id} — reload a previously computed Analysis (e.g. from History). */
+export async function getAnalysis(runId: string): Promise<Analysis> {
   if (isDemoMode()) {
-    return demoDelay({ ...sampleAnalysis, id });
+    return demoDelay({ ...sampleAnalysis, run_id: runId });
   }
-  return apiClient.get<Analysis>(`/analyze/${encodeURIComponent(id)}`);
+  return apiClient.get<Analysis>(`/analyze/${encodeURIComponent(runId)}`);
+}
+
+/**
+ * GET /analyses — list past repository analyses for the History page.
+ * Optional backend feature: callers should degrade gracefully (hide the
+ * section) if the endpoint isn't available yet.
+ */
+export async function getAnalyses(limit = 20, offset = 0): Promise<AnalysisHistoryResponse> {
+  if (isDemoMode()) {
+    return demoDelay({ ...sampleAnalysisHistory, limit, offset });
+  }
+  return apiClient.get<AnalysisHistoryResponse>("/analyses", { limit, offset });
 }

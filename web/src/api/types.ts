@@ -320,6 +320,23 @@ export interface AnalyzeRequest {
   path?: string;
 }
 
+/** Row shape for the analysis history list (GET /analyses). */
+export interface AnalysisSummary {
+  run_id: string;
+  repo_url: string | null;
+  language: string | null;
+  status: "complete" | "failed";
+  finding_count: number;
+  recommendation_count: number;
+  created_at: string;
+}
+
+export interface AnalysisHistoryResponse {
+  analyses: AnalysisSummary[];
+  limit: number;
+  offset: number;
+}
+
 // ── Health ───────────────────────────────────────────────────────────────
 
 export interface HealthResponse {

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { postAnalyze } from "../api/analyze";
 import { RepoIntelligence } from "../components/repo/RepoIntelligence";
 import { SectionMarker } from "../components/SectionMarker";
@@ -91,6 +92,11 @@ export function CartographerPage() {
       {state.status === "success" && state.data.status === "complete" && (
         <div className="cartographer-page__results">
           <hr className="hr" />
+          <div className="cartographer-page__permalink">
+            <Link to={`/analysis/${state.data.run_id}`} className="mono-label">
+              Permalink to this analysis &rarr;
+            </Link>
+          </div>
           <RepoIntelligence analysis={state.data} />
         </div>
       )}

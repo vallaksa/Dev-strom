@@ -33,3 +33,12 @@
   flex-direction: column;
   gap: var(--space-5);
 }
+
+.cartographer-page__permalink a {
+  text-decoration: none;
+  color: var(--ink-3);
+}
+
+.cartographer-page__permalink a:hover {
+  color: var(--accent);
+}

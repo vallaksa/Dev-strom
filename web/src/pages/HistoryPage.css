@@ -3,6 +3,15 @@
   margin-bottom: var(--space-6);
 }
 
+.history-section {
+  margin-bottom: var(--space-7);
+}
+
+.history-section__title {
+  font-size: 1.2rem;
+  margin-bottom: var(--space-4);
+}
+
 .history-table-wrap {
   padding: 0;
   overflow-x: auto;

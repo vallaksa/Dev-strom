@@ -1,4 +1,4 @@
-import type { Analysis } from "../api/types";
+import type { Analysis, AnalysisHistoryResponse } from "../api/types";
 import { sampleProjectGraph } from "./projectGraph";
 
 /**
@@ -243,4 +243,39 @@ export const sampleAnalysis: Analysis = {
   API --> Store[Services Layer]
   Store --> PG[(PostgreSQL)]
   Store -.opt-in.-> Neo[(Neo4j)]`,
+};
+
+/** Demo-mode listing for the History page's Repository Analyses section. */
+export const sampleAnalysisHistory: AnalysisHistoryResponse = {
+  analyses: [
+    {
+      run_id: sampleAnalysis.run_id,
+      repo_url: sampleAnalysis.repository.url,
+      language: sampleAnalysis.repository.language,
+      status: sampleAnalysis.status,
+      finding_count: sampleAnalysis.findings.length,
+      recommendation_count: sampleAnalysis.recommendations.length,
+      created_at: sampleAnalysis.created_at,
+    },
+    {
+      run_id: "demo-analysis-run-0002",
+      repo_url: "https://github.com/example-org/payment-platform",
+      language: "TypeScript",
+      status: "complete",
+      finding_count: 7,
+      recommendation_count: 6,
+      created_at: "2026-08-18T09:30:00Z",
+    },
+    {
+      run_id: "demo-analysis-run-0003",
+      repo_url: "https://github.com/example-org/legacy-monolith",
+      language: "Java",
+      status: "failed",
+      finding_count: 0,
+      recommendation_count: 0,
+      created_at: "2026-08-17T22:04:00Z",
+    },
+  ],
+  limit: 20,
+  offset: 0,
 };
