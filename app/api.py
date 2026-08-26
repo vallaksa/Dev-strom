@@ -100,7 +100,8 @@ def post_ideas(body: IdeasRequest):
             detail="Set OPENAI_API_KEY and TAVILY_API_KEY in .env",
         )
 
-    inputs = {"tech_stack": body.tech_stack, "count": body.count}
+    tech_stack = body.resolved_tech_stack
+    inputs = {"tech_stack": tech_stack, "count": body.count}
     if body.domain and body.domain.strip():
         inputs["domain"] = body.domain.strip()
     if body.level and body.level.strip():
@@ -138,7 +139,7 @@ def post_ideas(body: IdeasRequest):
 
     # Persist run to database
     run_id = save_run(
-        tech_stack=body.tech_stack,
+        tech_stack=tech_stack,
         domain=inputs.get("domain"),
         level=inputs.get("level"),
         count=body.count,

@@ -13,8 +13,12 @@ import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
+
+from app.cartographer.parse import build_project_graph
+from app.models.domain import Dependency, Repository
 
 logger = logging.getLogger(__name__)
 
@@ -179,3 +183,143 @@ def resolve_source(url_or_path: str, depth: int = 1) -> str:
         return resolved
 
     return clone_repo(url_or_path, depth=depth)
+
+
+# ── deterministic Repository ingestion (plan §17) ──────────────────────────────
+# Everything below is ordinary software: clone/resolve, read git metadata, walk
+# the tree (via parse.build_project_graph), and extract dependencies from
+# manifests — no LLM. It produces the reliable `Repository` domain model that
+# AI reasoning is layered on top of.
+
+# Manifest filename -> package ecosystem. Mirrors the manifests
+# parse.build_project_graph already extracts, tagged with their package manager
+# so a repo's Python and JS deps stay distinguishable.
+_MANIFEST_ECOSYSTEMS = {
+    "requirements.txt": "pypi",
+    "pyproject.toml": "pypi",
+    "package.json": "npm",
+    "go.mod": "go",
+    "pom.xml": "maven",
+}
+
+
+def _git_commit_sha(root: str) -> str | None:
+    """Return the resolved HEAD commit of the git repo at `root`, or None if
+    `root` is not a git working tree (a plain source directory) or git is
+    unavailable. Never raises — commit provenance is best-effort metadata."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", root, "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError) as exc:
+        logger.debug("No git commit sha for %s: %s", root, exc)
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
+def _primary_language(language_counts: dict[str, int]) -> str | None:
+    """Pick the single dominant code language (most files); ties broken
+    alphabetically for determinism. None when no code language was detected."""
+    if not language_counts:
+        return None
+    return max(sorted(language_counts), key=lambda lang: language_counts[lang])
+
+
+def _extract_dependencies(manifests: dict) -> list[Dependency]:
+    """Flatten `ProjectGraph.manifests` ({filename: [dep names]}) into a
+    deterministically-ordered list of `Dependency`, tagged with the ecosystem
+    of the manifest each came from. Unknown manifest filenames are tagged
+    "unknown" rather than dropped."""
+    deps: list[Dependency] = []
+    for filename in sorted(manifests):
+        ecosystem = _MANIFEST_ECOSYSTEMS.get(filename, "unknown")
+        for name in manifests[filename] or []:
+            deps.append(Dependency(name=name, ecosystem=ecosystem, source=filename))
+    return deps
+
+
+def _stable_repo_id(url: str | None, root_path: str, commit_sha: str | None) -> str:
+    """Deterministic id for a repository: same (url|root)+commit -> same id.
+
+    Uses uuid5 so re-ingesting the same commit yields a stable identifier
+    (useful for dedup / idempotent persistence) without a database round-trip.
+    """
+    key = f"{url or root_path}@{commit_sha or 'unknown'}"
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, key))
+
+
+def ingest_repository(
+    url_or_path: str,
+    repo_url: str | None = None,
+    depth: int = 1,
+) -> Repository:
+    """Deterministically ingest a repo into a `Repository` domain model.
+
+    Pipeline (all deterministic — no LLM): resolve/clone -> read HEAD commit
+    -> walk the tree and parse manifests (via parse.build_project_graph) ->
+    assemble metadata (languages, dependencies, entrypoints, counts).
+
+    Args:
+        url_or_path: a git URL (http/https/git/ssh or scp-like `git@host:path`)
+            or an existing local directory.
+        repo_url: provenance URL recorded on the Repository. Defaults to
+            `url_or_path` when that is a URL (i.e. not an existing local dir).
+        depth: shallow-clone depth for URL sources; ignored for local dirs.
+
+    Returns:
+        A populated `Repository`. Temporary clones are always cleaned up
+        before returning (success or failure); caller-supplied local
+        directories are never touched.
+
+    Raises:
+        IngestError: invalid URL, clone failure, or oversized repo.
+    """
+    was_local_dir = Path(url_or_path).expanduser().is_dir()
+    provenance = repo_url or (None if was_local_dir else url_or_path)
+    root_path = resolve_source(url_or_path, depth=depth)
+
+    try:
+        commit_sha = _git_commit_sha(root_path)
+        graph = build_project_graph(root_path, repo_url=provenance)
+    finally:
+        if not was_local_dir:
+            cleanup_clone(root_path)
+
+    repo = repository_from_graph(graph, commit_sha=commit_sha)
+    logger.info(
+        "Ingested repository %s (%s): %d deps, %d entrypoints, primary=%s",
+        repo.id, provenance or root_path, len(repo.dependencies),
+        len(repo.entrypoints), repo.language,
+    )
+    return repo
+
+
+def repository_from_graph(graph, commit_sha: str | None = None) -> Repository:
+    """Assemble a `Repository` from an already-parsed `ProjectGraph` (pure,
+    no I/O beyond nothing — no clone/parse).
+
+    Split out from `ingest_repository` so orchestration that already holds a
+    ProjectGraph (e.g. the analysis pipeline, which parses once and both
+    ingests and analyzes from that single graph) can build the Repository
+    without re-walking the tree. `graph.repo_url` / `graph.root_path` carry
+    the provenance recorded at parse time.
+    """
+    stats = graph.stats or {}
+    language_counts = stats.get("languages", {}) or {}
+    return Repository(
+        id=_stable_repo_id(graph.repo_url, graph.root_path, commit_sha),
+        url=graph.repo_url,
+        root_path=graph.root_path,
+        commit_sha=commit_sha,
+        language=_primary_language(language_counts),
+        languages=list(graph.languages),
+        dependencies=_extract_dependencies(graph.manifests),
+        entrypoints=list(graph.entrypoints),
+        file_count=int(stats.get("files", 0) or 0),
+        loc=int(stats.get("loc", 0) or 0),
+    )

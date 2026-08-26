@@ -9,11 +9,35 @@ from pydantic import BaseModel, Field, model_validator
 # ── Requests ──────────────────────────────────────────────────────────────────
 
 class IdeasRequest(BaseModel):
-    tech_stack: str
+    """Orion-2 contract: prefer natural-language `intent`; keep structured
+    fields optional for backward compatibility with older clients/history.
+    """
+
+    intent: str | None = Field(
+        default=None,
+        description="Natural-language description of what the user wants to build",
+    )
+    tech_stack: str | None = None
     domain: str | None = None
     level: str | None = None
     enable_multi_query: bool = False
     count: int = Field(default=3, ge=1, le=5)
+
+    @model_validator(mode="after")
+    def _require_intent_or_stack(self) -> "IdeasRequest":
+        has_intent = bool(self.intent and self.intent.strip())
+        has_stack = bool(self.tech_stack and self.tech_stack.strip())
+        if not has_intent and not has_stack:
+            raise ValueError("Provide 'intent' or 'tech_stack'.")
+        return self
+
+    @property
+    def resolved_tech_stack(self) -> str:
+        """Stack string passed into the idea graph; falls back to intent text."""
+        if self.tech_stack and self.tech_stack.strip():
+            return self.tech_stack.strip()
+        assert self.intent is not None
+        return self.intent.strip()
 
 
 class ExpandRequest(BaseModel):
