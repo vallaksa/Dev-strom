@@ -22,7 +22,11 @@ export function IdeasPage() {
     e.preventDefault();
     const trimmed = intent.trim();
     if (!trimmed) return;
-    run({ intent: trimmed, count });
+    // Send `intent` (the NL-first input) and mirror it into `tech_stack` for
+    // backward compatibility: a backend that predates the `intent` field still
+    // requires tech_stack, and the new backend backfills tech_stack = intent
+    // itself — so both branches behave identically and merge order is moot.
+    run({ intent: trimmed, tech_stack: trimmed, count });
   };
 
   return (
