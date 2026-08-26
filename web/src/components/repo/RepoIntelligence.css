@@ -1,0 +1,404 @@
+.repo-intel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+.repo-intel__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.repo-intel__title {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.repo-intel__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.repo-intel__runid {
+  color: var(--ink-3);
+}
+
+/* ── tabs ───────────────────────────────────────────────────────────────── */
+.repo-intel__tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: var(--hairline) solid var(--border);
+  flex-wrap: wrap;
+}
+
+.repo-intel__tab {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.repo-intel__tab:hover {
+  color: var(--accent);
+}
+
+.repo-intel__tab.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.repo-intel__panel {
+  min-height: 200px;
+}
+
+.repo-intel__muted {
+  color: var(--ink-3);
+  margin: var(--space-2) 0 0;
+}
+
+.repo-intel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.repo-intel__mono-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink-2);
+}
+
+.repo-intel__mono-list li {
+  padding: 2px 0;
+}
+
+/* ── overview ───────────────────────────────────────────────────────────── */
+.repo-intel__overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.repo-intel__summary {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+
+.repo-intel__facts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+
+.repo-intel__fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+}
+
+.repo-intel__fact-value {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.repo-intel__overview-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.repo-intel__count {
+  margin: var(--space-2) 0;
+}
+
+.repo-intel__commit {
+  color: var(--ink-3);
+}
+
+/* ── severity badges ────────────────────────────────────────────────────── */
+.repo-intel__sev {
+  text-transform: capitalize;
+}
+
+.repo-intel__sev--critical {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.repo-intel__sev--high {
+  color: #fff;
+  background: #c0491b;
+  border-color: #c0491b;
+}
+
+.repo-intel__sev--medium {
+  color: #fff;
+  background: #a3721f;
+  border-color: #a3721f;
+}
+
+.repo-intel__sev--low {
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.repo-intel__sev--info {
+  color: var(--info);
+  background: transparent;
+  border-color: var(--info);
+}
+
+/* ── architecture ───────────────────────────────────────────────────────── */
+.repo-intel__architecture {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.repo-intel__structural {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.repo-intel__eco {
+  margin-top: var(--space-3);
+}
+
+.repo-intel__deps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* ── design / findings ──────────────────────────────────────────────────── */
+.repo-intel__design {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.repo-intel__findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+}
+
+.repo-intel__finding-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.repo-intel__finding-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.repo-intel__finding-titles h4 {
+  margin: 0;
+}
+
+/* ── confidence meter ───────────────────────────────────────────────────── */
+.repo-intel__confidence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.repo-intel__meter {
+  flex: 1;
+  height: 6px;
+  max-width: 220px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.repo-intel__meter-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.repo-intel__meter-fill--high {
+  background: var(--ok);
+}
+
+.repo-intel__meter-fill--med {
+  background: #a3721f;
+}
+
+.repo-intel__meter-fill--low {
+  background: var(--danger);
+}
+
+.repo-intel__confidence-num {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+/* ── evidence ───────────────────────────────────────────────────────────── */
+.repo-intel__evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--hairline) solid var(--border-soft);
+}
+
+.repo-intel__evidence-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-left: 2px solid var(--accent-soft);
+  padding-left: var(--space-3);
+}
+
+.repo-intel__evidence-loc {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.repo-intel__snippet {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.repo-intel__snippet code {
+  white-space: pre;
+}
+
+.repo-intel__evidence-why {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+/* ── improvements ───────────────────────────────────────────────────────── */
+.repo-intel__improvements {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.repo-intel__impact-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.repo-intel__impact-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.repo-intel__rec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.repo-intel__rec-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.repo-intel__rec-titles {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.repo-intel__rec-titles h4 {
+  margin: 0;
+}
+
+.repo-intel__rec-priority {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.repo-intel__rec-badges {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.repo-intel__rec-rationale {
+  color: var(--ink-2);
+  margin-bottom: var(--space-2);
+}
+
+.repo-intel__rec-link {
+  margin: 0;
+  color: var(--ink-3);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+}
+
+.repo-intel__rec-link span {
+  color: var(--ink-2);
+}
+
+@media (max-width: 720px) {
+  .repo-intel__facts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .repo-intel__overview-cols {
+    grid-template-columns: 1fr;
+  }
+}

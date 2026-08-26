@@ -6,72 +6,71 @@ import { ErrorState, LoadingState } from "../components/StateBlocks";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import "./IdeasPage.css";
 
-const LEVELS = ["", "beginner", "intermediate", "advanced"];
+const EXAMPLES = [
+  "A challenging backend project involving event-driven systems, payments, and AI that pushes my distributed-systems skills.",
+  "Something with React and WebRTC — real-time collaboration, and I want to learn CRDTs properly.",
+  "A beginner-friendly Python data project I can finish in a weekend and put on my resume.",
+];
 
 export function IdeasPage() {
-  const [techStack, setTechStack] = useState("Python, FastAPI, React");
-  const [domain, setDomain] = useState("");
-  const [level, setLevel] = useState("");
+  const [intent, setIntent] = useState("");
   const [count, setCount] = useState(3);
-  const [multiQuery, setMultiQuery] = useState(false);
 
   const [state, run] = useAsyncAction(postIdeas);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    run({
-      tech_stack: techStack,
-      domain: domain || undefined,
-      level: level || undefined,
-      enable_multi_query: multiQuery,
-      count,
-    });
+    const trimmed = intent.trim();
+    if (!trimmed) return;
+    // Send `intent` (the NL-first input) and mirror it into `tech_stack` for
+    // backward compatibility: a backend that predates the `intent` field still
+    // requires tech_stack, and the new backend backfills tech_stack = intent
+    // itself — so both branches behave identically and merge order is moot.
+    run({ intent: trimmed, tech_stack: trimmed, count });
   };
 
   return (
     <div className="ideas-page">
-      <SectionMarker index="I" label="Idea Generator" />
-      <h1>What should you build next?</h1>
+      <SectionMarker index="I" label="Generate Ideas" />
+      <h1>What do you want to build?</h1>
       <p className="ideas-page__lede">
-        Describe a stack and Dev-Strom will draft scoped project ideas with a problem
-        statement, rationale, real-world value, and an implementation plan.
+        Describe what you're after in plain language — a stack, a domain, the kind of challenge
+        you want. Dev-Strom infers the rest and drafts project opportunities that teach engineering,
+        not just fill a repo.
       </p>
 
       <form className="ideas-form card" onSubmit={handleSubmit}>
-        <div className="ideas-form__grid">
-          <div className="field">
-            <label htmlFor="tech-stack">Tech Stack</label>
-            <input
-              id="tech-stack"
-              className="input"
-              value={techStack}
-              onChange={(e) => setTechStack(e.target.value)}
-              placeholder="e.g. Python, FastAPI, React"
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="domain">Domain (optional)</label>
-            <input
-              id="domain"
-              className="input"
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              placeholder="e.g. developer tools"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="level">Level (optional)</label>
-            <select id="level" className="input" value={level} onChange={(e) => setLevel(e.target.value)}>
-              {LEVELS.map((l) => (
-                <option key={l} value={l}>
-                  {l ? l[0].toUpperCase() + l.slice(1) : "Any"}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="count">Count (1&ndash;5)</label>
+        <div className="field">
+          <label htmlFor="intent">Your intent</label>
+          <textarea
+            id="intent"
+            className="input ideas-form__intent"
+            value={intent}
+            onChange={(e) => setIntent(e.target.value)}
+            placeholder="I'm looking for a challenging backend project involving event-driven systems, payments, and AI. I want something that pushes my distributed-systems skills."
+            rows={5}
+            required
+          />
+        </div>
+
+        <div className="ideas-form__examples">
+          <span className="mono-label">Try</span>
+          {EXAMPLES.map((ex, i) => (
+            <button
+              key={i}
+              type="button"
+              className="ideas-form__chip"
+              onClick={() => setIntent(ex)}
+              title={ex}
+            >
+              {ex.length > 52 ? ex.slice(0, 52) + "…" : ex}
+            </button>
+          ))}
+        </div>
+
+        <div className="ideas-form__footer">
+          <label className="ideas-form__count field">
+            <span>Ideas</span>
             <input
               id="count"
               type="number"
@@ -81,21 +80,19 @@ export function IdeasPage() {
               value={count}
               onChange={(e) => setCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
             />
-          </div>
+          </label>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={state.status === "loading" || !intent.trim()}
+          >
+            {state.status === "loading" ? "Generating…" : "Generate Ideas"}
+          </button>
         </div>
-
-        <label className="ideas-form__checkbox">
-          <input type="checkbox" checked={multiQuery} onChange={(e) => setMultiQuery(e.target.checked)} />
-          <span className="mono-label">Enable multi-query web search</span>
-        </label>
-
-        <button type="submit" className="btn btn-primary" disabled={state.status === "loading"}>
-          {state.status === "loading" ? "Generating…" : "Generate Ideas"}
-        </button>
       </form>
 
       <div className="ideas-page__results">
-        {state.status === "loading" && <LoadingState label="Generating ideas" />}
+        {state.status === "loading" && <LoadingState label="Understanding intent and drafting opportunities" />}
         {state.status === "error" && <ErrorState message={state.error} />}
         {state.status === "success" && (
           <>

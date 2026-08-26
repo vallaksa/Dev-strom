@@ -1,83 +1,103 @@
 import { useState, type FormEvent } from "react";
-import { postCartograph } from "../api/cartograph";
-import { ArchitectureReportView } from "../components/ArchitectureReportView";
-import { CartographGraph } from "../components/graph/CartographGraph";
+import { Link } from "react-router-dom";
+import { postAnalyze } from "../api/analyze";
+import { RepoIntelligence } from "../components/repo/RepoIntelligence";
 import { SectionMarker } from "../components/SectionMarker";
 import { ErrorState, LoadingState } from "../components/StateBlocks";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import "./CartographerPage.css";
 
-type InputMode = "repo_url" | "path";
-
 export function CartographerPage() {
-  const [mode, setMode] = useState<InputMode>("repo_url");
-  const [value, setValue] = useState("https://github.com/example-org/dev-strom");
+  const [url, setUrl] = useState("");
+  const [showPath, setShowPath] = useState(false);
+  const [path, setPath] = useState("");
 
-  const [state, run] = useAsyncAction(postCartograph);
+  const [state, run] = useAsyncAction(postAnalyze);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!value.trim()) return;
-    run(mode === "repo_url" ? { repo_url: value.trim() } : { path: value.trim() });
+    if (showPath) {
+      if (!path.trim()) return;
+      run({ path: path.trim() });
+    } else {
+      if (!url.trim()) return;
+      run({ repo_url: url.trim() });
+    }
   };
+
+  const loading = state.status === "loading";
 
   return (
     <div className="cartographer-page">
-      <SectionMarker index="II" label="Project Cartographer" />
-      <h1>Map a repository&rsquo;s architecture.</h1>
+      <SectionMarker index="II" label="Repository Intelligence" />
+      <h1>Analyze a repository.</h1>
       <p className="cartographer-page__lede">
-        Point Dev-Strom at a repo and it will parse the codebase into a structural graph,
-        then ask an LLM to summarize how it's put together.
+        Paste a GitHub URL. Dev-Strom reconstructs the system, reasons about its architecture and
+        design decisions, and tells you where it could be better — you don't need to specify what to
+        analyze.
       </p>
 
       <form className="card cartographer-form" onSubmit={handleSubmit}>
-        <div className="cartographer-form__mode">
-          <button
-            type="button"
-            className={"btn btn-sm " + (mode === "repo_url" ? "btn-primary" : "btn-secondary")}
-            onClick={() => setMode("repo_url")}
-          >
-            Repo URL
+        {!showPath ? (
+          <div className="field cartographer-form__field">
+            <label htmlFor="repo-url">Repository URL</label>
+            <input
+              id="repo-url"
+              className="input cartographer-form__url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://github.com/user/repository"
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+          </div>
+        ) : (
+          <div className="field cartographer-form__field">
+            <label htmlFor="repo-path">Local Path</label>
+            <input
+              id="repo-path"
+              className="input cartographer-form__url"
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              placeholder="/path/to/repo"
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+          </div>
+        )}
+
+        <div className="cartographer-form__actions">
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? "Analyzing…" : "Analyze Repository"}
           </button>
           <button
             type="button"
-            className={"btn btn-sm " + (mode === "path" ? "btn-primary" : "btn-secondary")}
-            onClick={() => setMode("path")}
+            className="btn btn-ghost btn-sm"
+            onClick={() => setShowPath((v) => !v)}
           >
-            Local Path
+            {showPath ? "Use a URL instead" : "Analyze a local path instead"}
           </button>
         </div>
-        <div className="field cartographer-form__input">
-          <label htmlFor="repo-target">{mode === "repo_url" ? "Repository URL" : "Local Path"}</label>
-          <input
-            id="repo-target"
-            className="input"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={mode === "repo_url" ? "https://github.com/org/repo" : "/path/to/repo"}
-            required
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={state.status === "loading"}>
-          {state.status === "loading" ? "Mapping…" : "Map Repository"}
-        </button>
       </form>
 
-      {state.status === "loading" && <LoadingState label="Cloning, parsing, and analyzing" />}
+      {loading && <LoadingState label="Cloning, parsing, and reasoning about the codebase" />}
       {state.status === "error" && <ErrorState message={state.error} />}
 
-      {state.status === "success" && (
+      {state.status === "success" && state.data.status === "failed" && (
+        <ErrorState message={state.data.summary || "Analysis failed."} />
+      )}
+
+      {state.status === "success" && state.data.status === "complete" && (
         <div className="cartographer-page__results">
           <hr className="hr" />
-          <div className="cartographer-page__run-meta mono-label">
-            Run {state.data.run_id} &middot; {state.data.project_graph.nodes.length} nodes &middot;{" "}
-            {state.data.project_graph.edges.length} edges &middot;{" "}
-            {state.data.project_graph.languages.join(", ") || "unknown language"}
+          <div className="cartographer-page__permalink">
+            <Link to={`/analysis/${state.data.run_id}`} className="mono-label">
+              Permalink to this analysis &rarr;
+            </Link>
           </div>
-
-          <CartographGraph graph={state.data.project_graph} />
-
-          <ArchitectureReportView report={state.data.architecture_report} />
+          <RepoIntelligence analysis={state.data} />
         </div>
       )}
     </div>

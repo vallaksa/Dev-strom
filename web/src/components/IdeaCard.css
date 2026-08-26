@@ -23,6 +23,34 @@
   margin-bottom: var(--space-1);
 }
 
+/* Engineering-intelligence sections carry a subtle accent rail so they read
+   as the "why this teaches you something" part of the card. */
+.idea-card__challenges,
+.idea-card__tradeoffs {
+  border-left: 2px solid var(--border-soft);
+  padding-left: var(--space-3) !important;
+  margin-left: 1px;
+}
+
+.idea-card__challenges {
+  border-left-color: var(--accent-soft);
+}
+
+.idea-card__intent {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.idea-card__intent .idea-card__label {
+  margin-top: 0;
+}
+
+.idea-card__intent p:last-child {
+  margin-bottom: 0;
+}
+
 .idea-card__expansion {
   margin-top: var(--space-2);
 }

@@ -12,6 +12,9 @@ const HistoryPage = lazy(() => import("./pages/HistoryPage").then((m) => ({ defa
 const RunDetailPage = lazy(() =>
   import("./pages/RunDetailPage").then((m) => ({ default: m.RunDetailPage })),
 );
+const AnalysisDetailPage = lazy(() =>
+  import("./pages/AnalysisDetailPage").then((m) => ({ default: m.AnalysisDetailPage })),
+);
 
 function App() {
   return (
@@ -23,6 +26,7 @@ function App() {
           <Route path="/advisor" element={<AdvisorPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/history/:runId" element={<RunDetailPage />} />
+          <Route path="/analysis/:runId" element={<AnalysisDetailPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
