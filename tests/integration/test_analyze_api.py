@@ -228,3 +228,44 @@ def test_get_analyze_run_not_found_returns_404(client, monkeypatch):
 def test_get_analyze_run_core_modules_unavailable_returns_503(client, monkeypatch):
     monkeypatch.setattr(api_module, "get_analysis_run", None)
     assert client.get("/analyze/nope").status_code == 503
+
+
+# ── GET /analyses (History list) ──────────────────────────────────────────────
+
+def _summary_row(n: int) -> dict:
+    return {
+        "run_id": f"run-{n}", "repo_url": f"https://x/{n}.git", "language": "python",
+        "status": "complete", "finding_count": n, "recommendation_count": n,
+        "created_at": "2026-01-01T00:00:00+00:00",
+    }
+
+
+def test_list_analyses_happy_path(client, monkeypatch):
+    monkeypatch.setattr(api_module, "list_analysis_runs",
+                        lambda limit, offset: [_summary_row(1), _summary_row(2)])
+    resp = client.get("/analyses")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["limit"] == 20 and body["offset"] == 0
+    assert [a["run_id"] for a in body["analyses"]] == ["run-1", "run-2"]
+    assert body["analyses"][0]["finding_count"] == 1
+
+
+def test_list_analyses_passes_pagination_through(client, monkeypatch):
+    calls = {}
+    monkeypatch.setattr(api_module, "list_analysis_runs",
+                        lambda limit, offset: calls.update(limit=limit, offset=offset) or [])
+    resp = client.get("/analyses", params={"limit": 5, "offset": 10})
+    assert resp.status_code == 200
+    assert calls == {"limit": 5, "offset": 10}
+    assert resp.json() == {"analyses": [], "limit": 5, "offset": 10}
+
+
+def test_list_analyses_rejects_out_of_range_limit(client):
+    assert client.get("/analyses", params={"limit": 0}).status_code == 422
+    assert client.get("/analyses", params={"limit": 101}).status_code == 422
+
+
+def test_list_analyses_unavailable_returns_503(client, monkeypatch):
+    monkeypatch.setattr(api_module, "list_analysis_runs", None)
+    assert client.get("/analyses").status_code == 503

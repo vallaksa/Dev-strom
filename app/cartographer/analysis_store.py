@@ -89,7 +89,9 @@ class PostgresJsonbStore(AnalysisStore):
 
     def list_runs(self, limit: int = 20, offset: int = 0) -> list[dict]:
         """Convenience helper (not part of the AnalysisStore interface) for
-        listing recent runs without the full JSONB payload."""
+        listing recent runs as lightweight SUMMARY rows for a History list:
+        run_id, repo_url, language, status, finding/recommendation counts, and
+        created_at — derived from the stored Analysis, not the full payload."""
         with get_session() as session:
             stmt = (
                 select(AnalysisRun)
@@ -98,11 +100,23 @@ class PostgresJsonbStore(AnalysisStore):
                 .offset(offset)
             )
             rows = session.execute(stmt).scalars().all()
-            return [
-                {
-                    "run_id": str(r.id),
-                    "repo_url": r.repo_url,
-                    "created_at": r.created_at.isoformat(),
-                }
-                for r in rows
-            ]
+            return [summarize_analysis_row(str(r.id), r.repo_url, r.analysis, r.created_at.isoformat()) for r in rows]
+
+
+def summarize_analysis_row(run_id: str, repo_url: str | None, analysis: dict | None, created_at: str) -> dict:
+    """Project a stored Analysis (JSONB dict) into a History-list summary row.
+
+    Pure and defensive so it can be unit-tested without a DB and never raises
+    on a partial/legacy payload: missing pieces default to null/0.
+    """
+    analysis = analysis or {}
+    repository = analysis.get("repository") or {}
+    return {
+        "run_id": run_id,
+        "repo_url": repo_url,
+        "language": repository.get("language"),
+        "status": analysis.get("status"),
+        "finding_count": len(analysis.get("findings") or []),
+        "recommendation_count": len(analysis.get("recommendations") or []),
+        "created_at": created_at,
+    }

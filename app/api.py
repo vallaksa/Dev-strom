@@ -82,11 +82,13 @@ try:
     _analysis_store = AnalysisPostgresJsonbStore()
     save_analysis_run = _analysis_store.save
     get_analysis_run = _analysis_store.get
+    list_analysis_runs = _analysis_store.list_runs
 except ImportError as exc:
     logging.getLogger(__name__).error("Analyzer modules failed to import: %s", exc)
     analyze_repository_with_graph = None
     get_analysis_run = None
     save_analysis_run = None
+    list_analysis_runs = None
 
 # ── Async Job Runner (F4) ────────────────────────────────────────────────────
 # Same guarding rationale as the Cartographer/Advisor imports above: keep
@@ -577,6 +579,24 @@ def get_analyze_run_detail(run_id: str):
     if record is None:
         raise HTTPException(status_code=404, detail=f"Analysis run {run_id} not found.")
     return _analysis_response(record["run_id"], record["analysis"], record.get("project_graph"))
+
+
+@api.get("/analyses")
+def list_analyses(
+    limit: int = Query(default=20, ge=1, le=100, description="Max analysis runs to return"),
+    offset: int = Query(default=0, ge=0, description="Pagination offset"),
+):
+    """List recent analysis runs as lightweight summary rows (run_id, repo_url,
+    language, status, finding/recommendation counts, created_at) for a History
+    list — most recent first. Mirrors GET /history's paging shape.
+    """
+    if list_analysis_runs is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Analyzer core modules (app.cartographer.analysis_store) are not available yet.",
+        )
+    analyses = list_analysis_runs(limit=limit, offset=offset)
+    return {"analyses": analyses, "limit": limit, "offset": offset}
 
 
 # ── Async Jobs (F4) ───────────────────────────────────────────────────────────

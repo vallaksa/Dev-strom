@@ -71,6 +71,7 @@ Both databases are standalone Docker daemons on `global-network` with `restart: 
 | GET | `/cartograph/{run_id}` | Load a cartograph run |
 | POST | `/analyze` | Evidence-first Repository Intelligence: deterministic ingest → `Analysis` (Repository + evidence-backed Findings + Recommendations) + component `mermaid` + structural `graph`; optional `?async=true` |
 | GET | `/analyze/{run_id}` | Load an analysis run (same flat body as POST) |
+| GET | `/analyses` | List recent analysis runs as summary rows (History), paged like `/history` |
 | POST | `/advise` | Improvement advisor; optional `?async=true` |
 | GET | `/advise/{run_id}` | Load an advisor run |
 | GET | `/jobs/{job_id}` | Poll async jobs |

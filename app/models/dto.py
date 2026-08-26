@@ -97,6 +97,24 @@ class AnalyzeResponse(BaseModel):
     mermaid: str | None = None
 
 
+class AnalysisSummary(BaseModel):
+    """One lightweight History-list row (not the full Analysis)."""
+
+    run_id: str
+    repo_url: str | None = None
+    language: str | None = None
+    status: str | None = None
+    finding_count: int = 0
+    recommendation_count: int = 0
+    created_at: str
+
+
+class AnalysisListResponse(BaseModel):
+    analyses: list[AnalysisSummary]
+    limit: int
+    offset: int
+
+
 # ── Improvement / Feature Advisor (F2) ───────────────────────────────────────
 # advisor_report below is typed as plain `dict` for the same reason
 # CartographResponse's fields are: the API layer dumps the real
