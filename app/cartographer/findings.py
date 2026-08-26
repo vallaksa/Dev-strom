@@ -194,59 +194,78 @@ def _opt_pos_int(value: Any) -> int | None:
     return n if n >= 1 else None
 
 
-def _coerce_findings(raw: Any, repository_id: str) -> list[Finding]:
+def _as_text(value: Any) -> str:
+    """Coerce LLM values to a stripped string; non-strings become ''."""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _coerce_findings(
+    raw: Any, repository_id: str
+) -> tuple[list[Finding], dict[int, str]]:
+    """Build Findings and a map from *raw* finding index -> accepted finding id.
+
+    Skipped/malformed entries do not compact the index space: recommendation
+    `finding_ref` values still refer to positions in the model's original
+    findings array.
+    """
     findings: list[Finding] = []
+    index_to_id: dict[int, str] = {}
     if not isinstance(raw, list):
-        return findings
+        return findings, index_to_id
     for i, item in enumerate(raw):
         if not isinstance(item, dict):
             continue
-        title = item.get("title")
-        if not (isinstance(title, str) and title.strip()):
+        title = _as_text(item.get("title"))
+        if not title:
             continue  # a finding with no title carries no signal
         evidence = _coerce_evidence(item.get("evidence"))
         if not evidence:
             # Evidence-First: keep it (so nothing is silently lost) but flag it.
             logger.warning("Finding %r has no citable evidence; keeping but flagging.", title)
+        finding_id = f"finding-{i + 1}"
         findings.append(
             Finding(
-                id=f"finding-{i + 1}",
+                id=finding_id,
                 repository_id=repository_id,
                 category=_coerce_literal(item.get("category"), _VALID_CATEGORIES, _DEFAULT_CATEGORY),
-                title=title.strip(),
-                description=(item.get("description") or "").strip(),
+                title=title,
+                description=_as_text(item.get("description")),
                 evidence=evidence,
                 confidence=_coerce_confidence(item.get("confidence")),
                 severity=_coerce_literal(item.get("severity"), _VALID_SEVERITIES, _DEFAULT_SEVERITY),
             )
         )
-    return findings
+        index_to_id[i] = finding_id
+    return findings, index_to_id
 
 
-def _coerce_recommendations(raw: Any, finding_ids: list[str]) -> list[Recommendation]:
+def _coerce_recommendations(
+    raw: Any, finding_index_to_id: dict[int, str]
+) -> list[Recommendation]:
     """Build Recommendations, resolving each `finding_ref` (0-based index into
-    the findings array) to the corresponding finding id. An out-of-range or
-    missing ref yields a cross-cutting recommendation (finding_id=None)."""
+    the model's original findings array) via `finding_index_to_id`. An
+    out-of-range, skipped, or missing ref yields a cross-cutting recommendation
+    (finding_id=None)."""
     recs: list[Recommendation] = []
     if not isinstance(raw, list):
         return recs
     for i, item in enumerate(raw):
         if not isinstance(item, dict):
             continue
-        title = item.get("title")
-        if not (isinstance(title, str) and title.strip()):
+        title = _as_text(item.get("title"))
+        if not title:
             continue
         ref = item.get("finding_ref")
         finding_id: str | None = None
-        if isinstance(ref, int) and 0 <= ref < len(finding_ids):
-            finding_id = finding_ids[ref]
+        if isinstance(ref, int) and ref in finding_index_to_id:
+            finding_id = finding_index_to_id[ref]
         recs.append(
             Recommendation(
                 id=f"rec-{i + 1}",
                 finding_id=finding_id,
                 type=_coerce_literal(item.get("type"), _VALID_REC_TYPES, _DEFAULT_REC_TYPE),
-                title=title.strip(),
-                description=(item.get("description") or "").strip(),
+                title=title,
+                description=_as_text(item.get("description")),
                 impact=_coerce_literal(item.get("impact"), _VALID_LEVELS, _DEFAULT_LEVEL),
                 effort=_coerce_literal(item.get("effort"), _VALID_LEVELS, _DEFAULT_LEVEL),
                 priority=_opt_pos_int(item.get("priority")) or (i + 1),
@@ -284,21 +303,20 @@ def parse_analysis(raw: str, repository: Repository) -> Analysis:
         data = json.loads(cleaned)
         if not isinstance(data, dict):
             raise ValueError("top-level analysis JSON must be an object")
+        findings, index_to_id = _coerce_findings(data.get("findings"), repository.id)
+        recommendations = _coerce_recommendations(data.get("recommendations"), index_to_id)
+        summary = data.get("summary")
+        return Analysis(
+            id=str(uuid.uuid4()),
+            repository=repository,
+            summary=_as_text(summary),
+            findings=findings,
+            recommendations=recommendations,
+            status="complete",
+        )
     except Exception as exc:
         logger.warning("Failed to parse Analysis JSON: %s", exc)
         return _minimal_analysis(repository, f"Analysis output could not be parsed: {exc}")
-
-    findings = _coerce_findings(data.get("findings"), repository.id)
-    recommendations = _coerce_recommendations(data.get("recommendations"), [f.id for f in findings])
-    summary = data.get("summary")
-    return Analysis(
-        id=str(uuid.uuid4()),
-        repository=repository,
-        summary=summary.strip() if isinstance(summary, str) else "",
-        findings=findings,
-        recommendations=recommendations,
-        status="complete",
-    )
 
 
 # ── public entry point ──────────────────────────────────────────────────────────

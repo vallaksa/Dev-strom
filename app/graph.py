@@ -152,7 +152,16 @@ Follow these instructions exactly and obey all guardrails:
         "Step 1: Architect/Setup...",
         "Step 2: Core Logic...",
         "Step 3: Integration/Polish..."
-      ]
+      ],
+      "engineering_challenges": [
+        "Concrete engineering problem this project forces you to solve (e.g. idempotency).",
+        "Another concrete challenge..."
+      ],
+      "architectural_intent": "1-2 sentences on why the architecture would be shaped this way.",
+      "tradeoffs": [
+        "What you gain vs. give up with this design."
+      ],
+      "business_value": "Business/real-world payoff (may echo real_world_value; keep concrete)."
     }
   ]
 }
@@ -163,6 +172,10 @@ Follow these instructions exactly and obey all guardrails:
    - "why_it_fits": Each string MUST start with the Tech Name followed by a colon. Do not list generic benefits; link the tech to the specific domain problem. Aim for one bullet per key tech.
    - "real_world_value": Focus on business value (cost, speed, accuracy, risk), not just coding practice.
    - "implementation_plan": 3–5 high-level, actionable steps that a developer could realistically follow.
+   - "engineering_challenges": 2–4 concrete engineering problems (not soft skills) the builder must confront.
+   - "architectural_intent": Why this shape of system — the design reasoning, not a restatement of the title.
+   - "tradeoffs": 1–3 honest tradeoffs the builder accepts with this design.
+   - "business_value": Concrete payoff; may align with real_world_value but should stay specific.
 
 5. DOMAIN BIAS:
    - If a Domain/Company is provided (e.g. Walmart, Fintech), use terminology and architectural patterns specific to that industry (e.g. "SCD Type 2" for data warehousing, "circuit breakers" for microservices).
@@ -218,6 +231,10 @@ _EMPTY_IDEA: dict = {
     "why_it_fits": [],
     "real_world_value": "",
     "implementation_plan": [],
+    "engineering_challenges": [],
+    "architectural_intent": None,
+    "tradeoffs": [],
+    "business_value": None,
 }
 
 

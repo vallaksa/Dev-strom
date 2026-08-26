@@ -93,6 +93,56 @@ def test_parse_analysis_resolves_finding_ref_to_finding_id():
     assert recs[1].finding_id is None
 
 
+def test_parse_analysis_finding_ref_uses_raw_indexes_when_findings_skipped():
+    """Skipped malformed findings must not compact finding_ref indexes."""
+    data = {
+        "summary": "s",
+        "findings": [
+            {"category": "design", "description": "no title — skipped"},
+            {
+                "category": "scalability",
+                "title": "Valid finding",
+                "description": "d",
+                "evidence": [{"explanation": "x"}],
+            },
+        ],
+        "recommendations": [
+            {"finding_ref": 0, "type": "engineering", "title": "For skipped", "description": "d"},
+            {"finding_ref": 1, "type": "scalability", "title": "For valid", "description": "d"},
+        ],
+    }
+    analysis = findings.parse_analysis(json.dumps(data), _repo())
+    assert len(analysis.findings) == 1
+    assert analysis.findings[0].id == "finding-2"
+    # ref 0 pointed at the skipped finding -> unlinked
+    assert analysis.recommendations[0].finding_id is None
+    # ref 1 pointed at the valid finding -> linked
+    assert analysis.recommendations[1].finding_id == "finding-2"
+
+
+def test_parse_analysis_non_string_description_does_not_raise():
+    data = {
+        "summary": 42,
+        "findings": [
+            {
+                "category": "design",
+                "title": "T",
+                "description": {"nested": True},
+                "evidence": [{"explanation": "ok"}],
+            }
+        ],
+        "recommendations": [
+            {"type": "engineering", "title": "R", "description": 7, "finding_ref": 0}
+        ],
+    }
+    analysis = findings.parse_analysis(json.dumps(data), _repo())
+    assert analysis.status == "complete"
+    assert analysis.summary == ""
+    assert analysis.findings[0].description == ""
+    assert analysis.recommendations[0].description == ""
+    assert analysis.recommendations[0].finding_id == analysis.findings[0].id
+
+
 def test_parse_analysis_strips_markdown_fences():
     raw = "```json\n" + json.dumps(_valid_analysis_dict()) + "\n```"
     analysis = findings.parse_analysis(raw, _repo())

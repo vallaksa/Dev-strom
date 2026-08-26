@@ -100,3 +100,19 @@ def test_parse_ideas_under_generation_returns_all_parsed():
     raw = json.dumps({"ideas": [_valid_idea(1)]})
     result = _parse_ideas(raw, expected_count=3)
     assert len(result) == 1
+
+
+def test_parse_ideas_preserves_rich_orion_fields():
+    idea = {
+        **_valid_idea(1),
+        "engineering_challenges": ["Idempotency"],
+        "architectural_intent": "Event-sourced recovery",
+        "tradeoffs": ["Ops complexity"],
+        "business_value": "Recover failed checkouts",
+    }
+    result = _parse_ideas(json.dumps({"ideas": [idea]}), expected_count=1)
+    assert len(result) == 1
+    assert result[0]["engineering_challenges"] == ["Idempotency"]
+    assert result[0]["architectural_intent"] == "Event-sourced recovery"
+    assert result[0]["tradeoffs"] == ["Ops complexity"]
+    assert result[0]["business_value"] == "Recover failed checkouts"
