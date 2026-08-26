@@ -62,7 +62,16 @@ concise architecture report.
   "data_flow": "1-3 sentences describing how data/requests move through the system end to end.",
   "external_integrations": ["Postgres", "OpenAI API", "..."],
   "mermaid": "flowchart TD\\n  A[Component A] --> B[Component B]\\n  ...",
-  "risks": ["Short bullet on a risk, gap, or architectural smell", "..."]
+  "risks": ["Short bullet on a risk, gap, or architectural smell", "..."],
+  "design_decisions": [
+    {
+      "title": "Short name of an architectural decision evidenced in the graph",
+      "why": "Why the system appears to have been designed this way.",
+      "benefits": ["What this choice buys"],
+      "tradeoffs": ["What this choice costs"],
+      "alternatives": ["Plausible alternative that was not chosen (optional)"]
+    }
+  ]
 }
 
 3. CONTENT GUIDELINES:
@@ -81,6 +90,9 @@ concise architecture report.
      markdown fences inside the JSON string. Keep it under 40 lines.
    - "risks": 1-5 short, concrete bullets (missing tests, tight coupling, no error
      handling, single points of failure, etc). Use [] if genuinely none are evidenced.
+   - "design_decisions": 1-5 reconstructed engineering decisions grounded in the graph
+     (not trivia like "uses Python"). Focus on *why* the design looks this way and what
+     it costs. Use [] only when the graph is too thin to support any decision.
 
 4. STRICT GUARDRAILS:
    - NO markdown, code blocks, comments, or text before/after/beside the JSON.
@@ -89,7 +101,7 @@ concise architecture report.
    - Base every claim on the provided graph/manifests/entrypoints; do not fabricate
      components, files, or integrations that have no evidence in the input.
    - If you cannot comply with all instructions, output exactly:
-     {"summary": "", "components": [], "layers": [], "data_flow": "", "external_integrations": [], "mermaid": "", "risks": []}
+     {"summary": "", "components": [], "layers": [], "data_flow": "", "external_integrations": [], "mermaid": "", "risks": [], "design_decisions": []}
 """
 
 
@@ -170,6 +182,7 @@ _EMPTY_REPORT_KWARGS: dict = {
     "external_integrations": [],
     "mermaid": "",
     "risks": [],
+    "design_decisions": [],
 }
 
 

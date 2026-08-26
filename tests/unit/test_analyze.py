@@ -109,6 +109,24 @@ def test_parse_architecture_report_schema_mismatch_returns_minimal_report(analyz
     assert len(report.risks) == 1
 
 
+def test_parse_architecture_report_preserves_design_decisions(analyze_mod):
+    payload = {
+        **_valid_report_dict(),
+        "design_decisions": [
+            {
+                "title": "Shallow clone",
+                "why": "Tip tree is enough for analysis",
+                "benefits": ["Speed"],
+                "tradeoffs": ["No history"],
+                "alternatives": ["Full clone"],
+            }
+        ],
+    }
+    report = analyze_mod.parse_architecture_report(json.dumps(payload))
+    assert len(report.design_decisions) == 1
+    assert report.design_decisions[0]["title"] == "Shallow clone"
+
+
 # ── summarize_graph ─────────────────────────────────────────────────────────
 
 

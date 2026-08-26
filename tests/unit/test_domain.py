@@ -125,3 +125,18 @@ def test_analysis_aggregates_repository_findings_recommendations():
     dumped = analysis.model_dump(mode="json")
     assert dumped["repository"]["id"] == "repo-1"
     assert dumped["findings"][0]["category"] == "testing"
+
+
+def test_idea_platform_model_requires_identity_and_title():
+    from app.models.domain import Idea
+
+    idea = Idea(
+        id="idea-1",
+        title="Event Bus Lab",
+        description="Learn distributed messaging.",
+        engineering_challenges=["Ordering", "At-least-once delivery"],
+    )
+    assert idea.run_id is None
+    assert idea.architecture == ""
+    with pytest.raises(ValidationError):
+        Idea(title="missing id", description="d")

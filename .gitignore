@@ -11,3 +11,7 @@ coverage.xml
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+
+# October (generated — context bus / browser MCP)
+.cursor/mcp.json
+.cursor/cli.json

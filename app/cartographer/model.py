@@ -109,3 +109,5 @@ class ArchitectureReport(BaseModel):
     external_integrations: list[str] = Field(default_factory=list)
     mermaid: str = ""
     risks: list[str] = Field(default_factory=list)
+    # Orion-2 Repo Intelligence "Design" tab (additive)
+    design_decisions: list[dict] = Field(default_factory=list)

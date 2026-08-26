@@ -25,6 +25,14 @@ class IdeasRequest(BaseModel):
             raise ValueError("Provide at least one of 'intent' or 'tech_stack'.")
         return self
 
+    @property
+    def resolved_tech_stack(self) -> str:
+        """Stack string used for search/storage; falls back to intent text."""
+        if self.tech_stack and self.tech_stack.strip():
+            return self.tech_stack.strip()
+        assert self.intent is not None
+        return self.intent.strip()
+
 
 class ExpandRequest(BaseModel):
     run_id: str = Field(..., description="Run ID from POST /ideas response")
