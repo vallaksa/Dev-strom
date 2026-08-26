@@ -15,3 +15,5 @@ htmlcov/
 # October (generated — context bus / browser MCP)
 .cursor/mcp.json
 .cursor/cli.json
+.codex/config.toml
+.codex/hooks.json

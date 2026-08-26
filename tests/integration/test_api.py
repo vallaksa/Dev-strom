@@ -110,6 +110,29 @@ def test_ideas_does_not_500_on_over_generation(client, monkeypatch):
     assert len(resp.json()["ideas"]) == requested
 
 
+def test_ideas_save_run_failure_still_returns_generated_ideas(client, monkeypatch):
+    """Generation succeeded; a down/misconfigured DB must not 500 the caller
+    out of the ideas they already paid an LLM call for."""
+    monkeypatch.setattr(
+        api_module,
+        "graph_app",
+        FakeGraphApp({"ideas": [make_idea(1)], "web_context": "ctx"}),
+    )
+
+    def boom(**kwargs):
+        raise ConnectionError("password authentication failed for user postgres")
+
+    monkeypatch.setattr(api_module, "save_run", boom)
+
+    resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["ideas"]) == 1
+    assert body["ideas"][0]["pid"] == 1
+    assert body["run_id"]
+
+
 def test_ideas_does_not_500_on_under_generation(client, monkeypatch):
     """Target behavior: the model under-generates (1 idea for count=3) ->
     the API should keep what it got instead of 500ing."""

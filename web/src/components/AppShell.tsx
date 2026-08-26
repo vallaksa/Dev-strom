@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useDemoMode } from "../hooks/useDemoMode";
+import { useIdeaGeneration } from "../hooks/useIdeaGeneration";
 import "./AppShell.css";
 
 const NAV_ITEMS = [
@@ -12,6 +13,8 @@ const NAV_ITEMS = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { demoMode, forced, setDemoMode } = useDemoMode();
+  const [generation] = useIdeaGeneration();
+  const generating = generation.status === "loading";
 
   return (
     <div className="app-shell">
@@ -31,11 +34,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to={item.to}
                 end={item.to === "/"}
                 className={({ isActive }) =>
-                  "app-shell__nav-link" + (isActive ? " is-active" : "")
+                  "app-shell__nav-link" +
+                  (isActive ? " is-active" : "") +
+                  (item.to === "/" && generating ? " is-busy" : "")
                 }
               >
                 <span className="app-shell__nav-index">{item.index}</span>
-                {item.label}
+                {item.to === "/" && generating ? "Generating…" : item.label}
               </NavLink>
             ))}
           </nav>

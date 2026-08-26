@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { postIdeas } from "../api/ideas";
 import { IdeaCard } from "../components/IdeaCard";
 import { SectionMarker } from "../components/SectionMarker";
 import { ErrorState, LoadingState } from "../components/StateBlocks";
-import { useAsyncAction } from "../hooks/useAsyncAction";
+import { useIdeaGeneration } from "../hooks/useIdeaGeneration";
 import "./IdeasPage.css";
 
 const EXAMPLES = [
@@ -16,7 +15,7 @@ export function IdeasPage() {
   const [intent, setIntent] = useState("");
   const [count, setCount] = useState(3);
 
-  const [state, run] = useAsyncAction(postIdeas);
+  const [state, run] = useIdeaGeneration();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

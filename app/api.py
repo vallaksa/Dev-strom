@@ -6,6 +6,7 @@ operations use the ANONYMOUS_USER_ID.
 """
 
 import logging
+import uuid
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
@@ -170,16 +171,21 @@ def post_ideas(body: IdeasRequest):
         d["pid"] = i
         out.append(d)
 
-    # Persist run to database
-    run_id = save_run(
-        tech_stack=effective_stack,
-        domain=inputs.get("domain"),
-        level=inputs.get("level"),
-        count=body.count,
-        enable_multi_query=body.enable_multi_query,
-        ideas=out,
-        web_context=result.get("web_context"),
-    )
+    # Persist run to database. Generation already succeeded — a down or
+    # misconfigured DB must not 500 away the ideas the caller just paid for.
+    try:
+        run_id = save_run(
+            tech_stack=effective_stack,
+            domain=inputs.get("domain"),
+            level=inputs.get("level"),
+            count=body.count,
+            enable_multi_query=body.enable_multi_query,
+            ideas=out,
+            web_context=result.get("web_context"),
+        )
+    except Exception:
+        logger.exception("Failed to persist idea run; returning generated ideas anyway")
+        run_id = str(uuid.uuid4())
 
     return {"ideas": out, "run_id": run_id}
 

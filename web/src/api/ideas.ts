@@ -7,10 +7,13 @@ import type { ExpandRequest, ExpandResponse, ExportRequest, Idea, IdeasRequest, 
 export async function postIdeas(body: IdeasRequest): Promise<IdeasResponse> {
   if (isDemoMode()) {
     const count = Math.max(1, Math.min(5, body.count || sampleIdeas.length));
-    return demoDelay({
-      run_id: `demo-run-${Date.now()}`,
-      ideas: sampleIdeas.slice(0, count).map((idea, i) => ({ ...idea, pid: i + 1 })),
-    });
+    return demoDelay(
+      {
+        run_id: `demo-run-${Date.now()}`,
+        ideas: sampleIdeas.slice(0, count).map((idea, i) => ({ ...idea, pid: i + 1 })),
+      },
+      1800,
+    );
   }
   return apiClient.post<IdeasResponse>("/ideas", body);
 }

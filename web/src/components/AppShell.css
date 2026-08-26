@@ -89,6 +89,14 @@
   color: var(--accent);
 }
 
+.app-shell__nav-link.is-busy {
+  color: var(--accent);
+}
+
+.app-shell__nav-link.is-busy .app-shell__nav-index {
+  color: var(--accent);
+}
+
 .demo-toggle {
   display: inline-flex;
   align-items: center;
