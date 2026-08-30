@@ -17,7 +17,7 @@ import { DetailPanel } from "./DetailPanel";
 import { getEdgeStyle } from "./edgeStyle";
 import { graphNodeTypes, type GraphNodeData } from "./GraphNode";
 import { Legend } from "./Legend";
-import "./CartographGraph.css";
+import "./ProjectGraphView.css";
 
 const SYSTEM_TYPES: NodeType[] = [
   "repo",
@@ -83,8 +83,8 @@ function GraphInner({ graph }: { graph: ProjectGraph }) {
   };
 
   return (
-    <div className="carto-graph">
-      <div className="carto-graph__canvas panel-dark">
+    <div className="project-graph-view">
+      <div className="project-graph-view__canvas panel-dark">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -109,7 +109,7 @@ function GraphInner({ graph }: { graph: ProjectGraph }) {
             style={{ background: "var(--canvas-2)" }}
           />
         </ReactFlow>
-        <div className="carto-graph__legend-overlay">
+        <div className="project-graph-view__legend-overlay">
           <Legend activeTypes={activeTypes} onToggle={toggleType} counts={counts} />
         </div>
       </div>
@@ -126,7 +126,7 @@ function GraphInner({ graph }: { graph: ProjectGraph }) {
   );
 }
 
-export function CartographGraph({ graph }: { graph: ProjectGraph }) {
+export function ProjectGraphView({ graph }: { graph: ProjectGraph }) {
   return (
     <ReactFlowProvider>
       <GraphInner graph={graph} />

@@ -17,7 +17,7 @@ export interface IdeasRequest {
   tech_stack?: string;
   domain?: string;
   level?: string;
-  enable_multi_query?: boolean;
+  enable_multi_query?: boolean; /** @deprecated No longer affects web context */
 }
 
 export interface Idea {
@@ -87,7 +87,7 @@ export interface RunDetail {
   [key: string]: unknown;
 }
 
-// ── Project Cartographer ────────────────────────────────────────────────
+// ── Project graph (structural) ──────────────────────────────────────────
 
 export type NodeType =
   | "repo"
@@ -136,78 +136,6 @@ export interface ProjectGraph {
   stats: Record<string, unknown>;
 }
 
-export interface ArchitectureComponent {
-  name: string;
-  responsibility: string;
-  node_ids: string[];
-}
-
-export interface ArchitectureReport {
-  summary: string;
-  components: ArchitectureComponent[];
-  layers: string[];
-  data_flow: string;
-  external_integrations: string[];
-  mermaid: string;
-  risks: string[];
-}
-
-export interface CartographRequest {
-  repo_url?: string;
-  path?: string;
-}
-
-export interface CartographResponse {
-  run_id: string;
-  project_graph: ProjectGraph;
-  architecture_report: ArchitectureReport;
-}
-
-// ── Advisor ──────────────────────────────────────────────────────────────
-
-export type RecommendationCategory =
-  | "feature"
-  | "refactor"
-  | "tech_debt"
-  | "risk"
-  | "test"
-  | "security"
-  | "performance"
-  | "docs";
-
-export type ImpactLevel = "high" | "medium" | "low";
-export type EffortLevel = "high" | "medium" | "low";
-
-export interface Recommendation {
-  id: string;
-  category: RecommendationCategory;
-  title: string;
-  rationale: string;
-  impact: ImpactLevel;
-  effort: EffortLevel;
-  affected_node_ids: string[];
-  suggested_steps: string[];
-}
-
-export interface AdvisorReport {
-  summary: string;
-  tech_stack: string[];
-  recommendations: Recommendation[];
-  quick_wins: string[];
-  strategic_bets: string[];
-}
-
-export interface AdviseRequest {
-  repo_url?: string;
-  path?: string;
-  run_id?: string;
-}
-
-export interface AdviseResponse {
-  run_id: string;
-  advisor_report: AdvisorReport;
-}
-
 // ── Repository Analysis (unified Analysis domain model) ──────────────────
 // Mirrors the backend's `Analysis.model_dump(mode="json")` produced by
 // analyze_repository(). This is the evidence-first contract that powers the
@@ -225,6 +153,9 @@ export type FindingCategory =
   | "product";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
+
+export type ImpactLevel = "high" | "medium" | "low";
+export type EffortLevel = "high" | "medium" | "low";
 
 export type RecommendationType =
   | "product"
@@ -303,9 +234,8 @@ export interface Analysis {
   findings: AnalysisFinding[];
   recommendations: AnalysisRecommendation[];
   /**
-   * Full structural ProjectGraph built deterministically during ingestion —
-   * same shape as CartographResponse.project_graph, so it renders directly in
-   * the interactive graph. Null when no graph was produced.
+   * Full structural ProjectGraph built deterministically during ingestion.
+   * Null when no graph was produced.
    */
   graph?: ProjectGraph | null;
   /** Optional architecture diagram (Mermaid) fallback. Additive; may be null. */

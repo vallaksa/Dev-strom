@@ -5,8 +5,8 @@ just-in-time infra, this is deliberately just three functions plus a
 Postgres-backed record, designed to be handed to FastAPI's
 `BackgroundTasks.add_task(...)`:
 
-    job_id = create_job(kind="cartograph", params={"repo_url": repo_url})
-    background_tasks.add_task(run_job, job_id, lambda: run_cartograph_pipeline(repo_url))
+    job_id = create_job(kind="analyze", params={"repo_url": repo_url})
+    background_tasks.add_task(run_job, job_id, lambda: run_analyze_pipeline(repo_url))
     return {"job_id": job_id}
 
 and later polled via:
@@ -14,7 +14,7 @@ and later polled via:
     GET /jobs/{job_id} -> get_job(job_id)
 
 Persistence follows the same get_session()/ORM pattern as
-app.cartographer.store.PostgresJsonbStore and app.services.run_service -
+app.cartographer.analysis_store.PostgresJsonbStore and app.services.run_service -
 see those modules for the canonical idiom this one copies.
 """
 

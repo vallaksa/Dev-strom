@@ -46,7 +46,7 @@ export const sampleIdeas: Idea[] = [
       "something breaks or a CVE lands.",
     why_it_fits: [
       "Combines static analysis with an LLM-authored human-readable risk summary.",
-      "Useful against Dev-Strom's own Cartographer output — natural synergy.",
+      "Useful against Dev-Strom's own Repository Intelligence output — natural synergy.",
     ],
     real_world_value:
       "Turns a routine security/maintenance task into a scheduled report a team can " +

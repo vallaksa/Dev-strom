@@ -1,9 +1,9 @@
-.cartographer-page__lede {
+.repo-intel-page__lede {
   max-width: 640px;
   font-size: 1.05rem;
 }
 
-.cartographer-form {
+.repo-intel-form {
   margin-top: var(--space-6);
   margin-bottom: var(--space-6);
   display: flex;
@@ -11,34 +11,40 @@
   gap: var(--space-4);
 }
 
-.cartographer-form__field {
+.repo-intel-form__mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.repo-intel-form__field {
   width: 100%;
 }
 
-.cartographer-form__url {
+.repo-intel-form__input {
   font-family: var(--font-mono);
   font-size: 1rem;
   padding: var(--space-4);
 }
 
-.cartographer-form__actions {
+.repo-intel-form__actions {
   display: flex;
   align-items: center;
   gap: var(--space-4);
   flex-wrap: wrap;
 }
 
-.cartographer-page__results {
+.repo-intel-page__results {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
-.cartographer-page__permalink a {
+.repo-intel-page__permalink a {
   text-decoration: none;
   color: var(--ink-3);
 }
 
-.cartographer-page__permalink a:hover {
+.repo-intel-page__permalink a:hover {
   color: var(--accent);
 }

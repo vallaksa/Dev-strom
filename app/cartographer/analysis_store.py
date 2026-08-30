@@ -3,8 +3,8 @@
 `AnalysisStore` is the interface the API/integration layer depends on;
 `PostgresJsonbStore` is the concrete implementation, storing the domain
 `Analysis` (and the structural `ProjectGraph` it was derived from) as JSONB
-in the `analysis_runs` table. Mirrors `app.cartographer.store` /
-`app.advisor.store` exactly (same interface shape, same `get_session`
+in the `analysis_runs` table. Mirrors `app.services.run_service` /
+`app.services.run_service` exactly (same interface shape, same `get_session`
 usage) — see those modules for the rationale.
 """
 

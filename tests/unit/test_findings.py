@@ -1,9 +1,7 @@
-"""Unit tests for app.cartographer.findings: the evidence-first structured
-analysis (ProjectGraph + Repository -> Analysis).
+"""Unit tests for app.cartographer.findings: evidence-first structured analysis.
 
-Hermetic/mockable in the same spirit as test_analyze.py: `parse_analysis`
-never touches the network, and `analyze_findings` is exercised with
-`_invoke_with_fallback` monkeypatched so no real LLM/model call happens.
+Hermetic: `parse_analysis` never touches the network; `analyze_findings` is
+exercised with `_invoke_with_fallback` monkeypatched.
 """
 
 import json
@@ -24,13 +22,13 @@ def _valid_analysis_dict() -> dict:
             {
                 "category": "scalability",
                 "title": "Synchronous analysis blocks the request",
-                "description": "Cartograph runs inline on the HTTP request.",
+                "description": "Analysis runs inline on the HTTP request.",
                 "confidence": 0.75,
                 "severity": "high",
                 "evidence": [
                     {
                         "file": "app/api.py",
-                        "symbol": "post_cartograph",
+                        "symbol": "post_analyze",
                         "explanation": "clone+parse+LLM all run before the response returns",
                     }
                 ],

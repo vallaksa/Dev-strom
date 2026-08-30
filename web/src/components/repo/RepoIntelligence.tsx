@@ -8,7 +8,7 @@ import type {
   ImpactLevel,
   Severity,
 } from "../../api/types";
-import { CartographGraph } from "../graph/CartographGraph";
+import { ProjectGraphView } from "../graph/ProjectGraphView";
 import { MermaidDiagram } from "../graph/MermaidDiagram";
 import { EmptyState } from "../StateBlocks";
 import "./RepoIntelligence.css";
@@ -206,7 +206,7 @@ function ArchitectureTab({ analysis }: { analysis: Analysis }) {
           <p className="repo-intel__muted">
             Services, integrations, and entrypoints — not individual classes or files.
           </p>
-          <CartographGraph graph={graph} />
+          <ProjectGraphView graph={graph} />
         </div>
       ) : !mermaid ? (
         <EmptyState message="No architecture diagram was produced for this run." />

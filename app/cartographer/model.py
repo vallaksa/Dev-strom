@@ -1,9 +1,9 @@
-"""Shared data contract for Project Cartographer (F1).
+"""Shared data contract for repository intelligence ingestion.
 
-These pydantic models are THE contract between this agent (ingest + parse ->
-ProjectGraph) and the companion F1 agent building the LLM analyzer + API/UI
-(ProjectGraph -> ArchitectureReport). Both sides import from this module -
-do not duplicate or fork these definitions elsewhere.
+These pydantic models are THE contract between the deterministic parser
+(ingest + parse -> ProjectGraph) and the evidence-first analysis layer.
+Both sides import from this module — do not duplicate or fork these
+definitions elsewhere.
 
 Field shapes are deliberately permissive (lots of `dict` / `list[dict]`)
 because the two producers (deterministic parser vs. LLM) fill them
@@ -76,8 +76,8 @@ class ProjectGraph(BaseModel):
     """The normalized structural graph produced by parse.build_project_graph.
 
     This is the deterministic, parser-derived half of the contract. The
-    other agent's ArchitectureReport is derived FROM a ProjectGraph (usually
-    via an LLM) but is stored/returned separately - see ArchitectureReport.
+    evidence-first `Analysis` (findings + recommendations) is derived FROM
+    a ProjectGraph but is stored/returned separately via the analysis store.
     """
 
     repo_url: str | None = None
@@ -88,26 +88,3 @@ class ProjectGraph(BaseModel):
     entrypoints: list[str] = Field(default_factory=list)
     manifests: dict = Field(default_factory=dict)
     stats: dict = Field(default_factory=dict)
-
-
-# ── ArchitectureReport ───────────────────────────────────────────────────────
-
-
-class ArchitectureReport(BaseModel):
-    """LLM-authored architectural summary of a ProjectGraph.
-
-    Defined here (rather than in the other agent's package) purely so both
-    sides of F1 can import a single shared contract. This agent does not
-    populate it - the LLM-analyzer agent is responsible for producing
-    instances of this model from a ProjectGraph.
-    """
-
-    summary: str
-    components: list[dict] = Field(default_factory=list)  # {name, responsibility, node_ids: list[str]}
-    layers: list[str] = Field(default_factory=list)
-    data_flow: str = ""
-    external_integrations: list[str] = Field(default_factory=list)
-    mermaid: str = ""
-    risks: list[str] = Field(default_factory=list)
-    # Orion-2 Repo Intelligence "Design" tab (additive)
-    design_decisions: list[dict] = Field(default_factory=list)

@@ -69,18 +69,18 @@ def fake_db(monkeypatch):
 
 
 def test_create_job_returns_string_id(fake_db):
-    job_id = create_job(kind="cartograph", params={"repo_url": "https://example.com/repo"})
+    job_id = create_job(kind="analyze", params={"repo_url": "https://example.com/repo"})
     assert isinstance(job_id, str)
     # round-trips through uuid.UUID without raising
     uuid.UUID(job_id)
 
 
 def test_create_job_persists_pending_status(fake_db):
-    job_id = create_job(kind="advise", params={"repo_url": "https://example.com/repo"})
+    job_id = create_job(kind="analyze", params={"repo_url": "https://example.com/repo"})
     job = get_job(job_id)
     assert job is not None
     assert job["status"] == JobStatus.PENDING.value
-    assert job["kind"] == "advise"
+    assert job["kind"] == "analyze"
     assert job["params"] == {"repo_url": "https://example.com/repo"}
     assert job["result"] is None
     assert job["error"] is None
@@ -99,7 +99,7 @@ def test_get_job_malformed_id_returns_none(fake_db):
 
 
 def test_run_job_success_marks_done_and_stores_result(fake_db):
-    job_id = create_job(kind="cartograph", params={})
+    job_id = create_job(kind="analyze", params={})
 
     def fn():
         return {"ok": True, "value": 42}
@@ -113,7 +113,7 @@ def test_run_job_success_marks_done_and_stores_result(fake_db):
 
 
 def test_run_job_failure_marks_error_and_does_not_raise(fake_db):
-    job_id = create_job(kind="advise", params={})
+    job_id = create_job(kind="analyze", params={})
 
     def fn():
         raise ValueError("boom")
@@ -127,7 +127,7 @@ def test_run_job_failure_marks_error_and_does_not_raise(fake_db):
 
 
 def test_run_job_updates_updated_at(fake_db):
-    job_id = create_job(kind="cartograph", params={})
+    job_id = create_job(kind="analyze", params={})
     before = get_job(job_id)["updated_at"]
 
     run_job(job_id, lambda: {"done": True})

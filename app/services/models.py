@@ -108,15 +108,10 @@ class ExpandedIdea(Base):
     run: Mapped["Run"] = relationship(back_populates="expanded_ideas")
 
 
-# ── cartograph_runs (F1: Project Cartographer) ──────────────────────────────────
+# ── cartograph_runs (legacy — table retained, no longer written) ───────────────
 class CartographRun(Base):
-    """One row per Project Cartographer run: the parsed ProjectGraph and,
-    once the LLM-analyzer agent has run, the derived ArchitectureReport.
-
-    Both JSONB payloads are stored as plain dicts (pydantic `.model_dump()`
-    output from app.cartographer.model.ProjectGraph / ArchitectureReport) -
-    this ORM layer intentionally does not import those pydantic models, to
-    keep the persistence layer decoupled from the contract's shape.
+    """Legacy F1 cartograph runs. Superseded by `analysis_runs`; kept so
+    existing rows remain readable until a follow-up migration drops the table.
     """
 
     __tablename__ = "cartograph_runs"
@@ -136,24 +131,10 @@ class CartographRun(Base):
     )
 
 
-# ── advisor_runs (F2: Improvement / Feature Advisor) ────────────────────────────
+# ── advisor_runs (legacy — table retained, no longer written) ────────────────
 class AdvisorRun(Base):
-    """One row per Improvement / Feature Advisor run: the prioritized
-    AdvisorReport produced from a ProjectGraph (+ optional
-    ArchitectureReport), plus provenance back to the cartograph run it was
-    derived from (when it was loaded from one) and/or the repo it targeted.
-
-    `cartograph_run_id` is a loose reference (no FK constraint) rather than
-    a `ForeignKey("cartograph_runs.id")` on purpose: an advisor run can be
-    produced from a fresh (unpersisted) cartograph pipeline run, in which
-    case there is no cartograph_runs row to point at, so this column must
-    stay nullable and unconstrained.
-
-    `advisor_report` is stored as a plain dict (pydantic `.model_dump()`
-    output from app.advisor.model.AdvisorReport) - this ORM layer
-    intentionally does not import that pydantic model, to keep the
-    persistence layer decoupled from the contract's shape (same pattern as
-    CartographRun above).
+    """Legacy F2 advisor runs. Superseded by analysis `recommendations`; kept
+    so existing rows remain readable until a follow-up migration drops the table.
     """
 
     __tablename__ = "advisor_runs"
@@ -180,10 +161,9 @@ class AnalysisRun(Base):
     derived from, both as JSONB.
 
     `analysis` is `app.models.domain.Analysis.model_dump()`; `project_graph`
-    is `app.cartographer.model.ProjectGraph.model_dump()` (nullable — kept so
-    the Architecture tab can reload a past run's wiring diagram). As with
-    CartographRun / AdvisorRun, this ORM layer intentionally does not import
-    those pydantic models, keeping persistence decoupled from their shape.
+    is `app.cartographer.model.ProjectGraph.model_dump()` (nullable). This ORM
+    layer intentionally does not import those pydantic models, keeping
+    persistence decoupled from their shape.
     """
 
     __tablename__ = "analysis_runs"
@@ -204,7 +184,7 @@ class AnalysisRun(Base):
 
 # ── jobs (F4-surface: in-process background job runner) ─────────────────────────
 class Job(Base):
-    """One row per background job (e.g. an async /cartograph or /advise run).
+    """One row per background job (e.g. an async /analyze run).
 
     `params` captures the inputs the job was started with; `result` is set
     once the job finishes successfully (must be JSON-serializable); `error`

@@ -1,17 +1,17 @@
-.carto-graph {
+.project-graph-view {
   display: flex;
   gap: var(--space-4);
   height: 640px;
 }
 
-.carto-graph__canvas {
+.project-graph-view__canvas {
   position: relative;
   flex: 1;
   min-width: 0;
   background: var(--canvas) !important;
 }
 
-.carto-graph__legend-overlay {
+.project-graph-view__legend-overlay {
   position: absolute;
   top: var(--space-4);
   left: var(--space-4);

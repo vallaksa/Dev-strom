@@ -37,11 +37,7 @@ def fetch_real_world_problems(intent: str) -> str:
     if settings.tavily_api_key:
         logger.warning("Sonar fetch failed; falling back to Tavily")
         try:
-            return web_search_project_ideas.invoke({
-                "tech_stack": intent,
-                "enable_multi_query": False,
-                "domain": None,
-            }) or ""
+            return web_search_project_ideas.invoke({"tech_stack": intent}) or ""
         except Exception:
             logger.exception("Tavily fallback also failed")
     return ""
