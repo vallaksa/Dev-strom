@@ -2,7 +2,8 @@ import { useState, type FormEvent } from "react";
 import { IdeaCard } from "../components/IdeaCard";
 import { SectionMarker } from "../components/SectionMarker";
 import { ErrorState, LoadingState } from "../components/StateBlocks";
-import { useIdeaGeneration } from "../hooks/useIdeaGeneration";
+import { useIdeaGeneration, type IdeaBatch } from "../hooks/useIdeaGeneration";
+import type { IdeasRequest } from "../api/types";
 import "./IdeasPage.css";
 
 const EXAMPLES = [
@@ -18,23 +19,32 @@ export function IdeasPage() {
 
   const [state, run] = useIdeaGeneration();
 
-  const submitIntent = (refinement?: string) => {
+  const buildRequest = (refinement?: string, batches?: IdeaBatch[]): IdeasRequest => {
     const trimmed = intent.trim();
-    if (!trimmed) return;
-    run({
+    const prior_ideas = batches?.flatMap((batch) =>
+      batch.ideas.map((idea) => ({
+        name: idea.name,
+        problem_statement: idea.problem_statement,
+      })),
+    );
+    return {
       intent: trimmed,
       tech_stack: trimmed,
       refinement_context: refinement?.trim() || undefined,
-    });
+      prior_ideas: prior_ideas?.length ? prior_ideas : undefined,
+    };
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    submitIntent();
+    if (!intent.trim()) return;
+    run(buildRequest(), { append: false });
   };
 
   const handleGenerateMore = () => {
-    submitIntent(showRefinement ? refinementContext : undefined);
+    if (!intent.trim()) return;
+    const batches = state.status === "success" ? state.batches : [];
+    run(buildRequest(showRefinement ? refinementContext : undefined, batches), { append: true });
   };
 
   const totalIdeas =
@@ -122,6 +132,7 @@ export function IdeasPage() {
           >
             Generate more
           </button>
+          {state.appendError && <p className="error-text">{state.appendError}</p>}
         </div>
       )}
 

@@ -11,6 +11,7 @@
 export interface IdeasRequest {
   intent: string;
   refinement_context?: string;
+  prior_ideas?: Array<{ name: string; problem_statement: string }>;
   /** @deprecated Ignored — backend always returns 2 cards per request */
   count?: number;
   tech_stack?: string;
