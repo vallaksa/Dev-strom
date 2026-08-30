@@ -97,7 +97,7 @@ A minimal but working idea generator. User enters a tech stack, the system searc
 User Input (tech_stack)
      ↓
 [LangGraph Pipeline]
-     ├── Node 1: fetch_web_context  → Tavily web search → stores in state
+     ├── Node 1: fetch_web_context  → Sonar (primary) / Tavily (fallback) → stores in state
      └── Node 2: generate_ideas    → DeepAgent + OpenAI LLM → returns 3 ideas as JSON
      ↓
 Output: 3 project ideas (name, problem, why_it_fits, value, plan)
@@ -110,7 +110,7 @@ Output: 3 project ideas (name, problem, why_it_fits, value, plan)
 | Orchestration| LangGraph                           |
 | Agent        | DeepAgents (`create_deep_agent`)    |
 | LLM          | OpenAI GPT (via DeepAgent)          |
-| Web Search   | Tavily API                          |
+| Web Search   | Perplexity Sonar via OpenRouter (primary); Tavily fallback (`tools.py`) |
 | Schema       | Pydantic (`ProjectIdea`, `IdeasResponse`) |
 | API          | FastAPI (`POST /ideas`, `POST /expand`, `POST /export`) |
 | UI           | Streamlit (`ui.py`)                 |
@@ -121,7 +121,7 @@ Output: 3 project ideas (name, problem, why_it_fits, value, plan)
 | File                | Purpose                                         |
 |---------------------|-------------------------------------------------|
 | `graph.py`          | LangGraph pipeline (nodes, state, graph build)  |
-| `tools.py`          | Tavily web search LangChain tool                |
+| `tools.py`          | Tavily fallback LangChain tool (Sonar is primary in `web_context.py`) |
 | `schema.py`         | Pydantic models (ProjectIdea, IdeasResponse, ExpandedIdea) |
 | `api.py`            | FastAPI endpoints (ideas, expand, export)        |
 | `ui.py`             | Streamlit browser UI                            |

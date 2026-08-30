@@ -24,7 +24,7 @@ Edit `.env` and set:
 | Variable | Required | Description |
 |---|---|---|
 | `API_KEY` | Yes | LLM provider key (OpenAI-compatible, e.g. OpenRouter) |
-| `TAVILY_API_KEY` | Yes | For web search ([Tavily](https://tavily.com)) |
+| `TAVILY_API_KEY` | Recommended | Fallback web search when Sonar fails ([Tavily](https://tavily.com)) |
 | `DATABASE_URL` | V3+ | PostgreSQL connection string (see [Database setup](#database-setup-v3)) |
 
 ---
@@ -34,8 +34,7 @@ Edit `.env` and set:
 | Option | Command | Description |
 |--------|---------|-------------|
 | **Web UI** | `cd web && npm install && npm run dev` | React app on port 5173. Proxies `/api/*` to FastAPI — start the API first. |
-| **API** | `uvicorn app.api:api --reload` | HTTP server on port 8000. Required for the web UI and CLI. |
-| **CLI** | `python scripts/run_graph.py "LangChain, LangGraph"` | Prints ideas to the terminal. Optional: `--count` (1–5), `--domain`, `--level`, `--enable-multi-query`, `--stream`, `--debug`. |
+| **API** | `uvicorn app.api:api --reload` | HTTP server on port 8000. Required for the web UI. |
 
 `GET /health` (liveness) and `GET /ready` (readiness — pings the database when `DATABASE_URL` is configured) are available once the API is running.
 
@@ -46,7 +45,7 @@ Edit `.env` and set:
 ```bash
 curl -X POST http://localhost:8000/ideas \
   -H "Content-Type: application/json" \
-  -d '{"tech_stack": "React, Node.js, PostgreSQL", "domain": "fintech", "enable_multi_query": true, "count": 5}'
+  -d '{"tech_stack": "React, Node.js, PostgreSQL", "domain": "fintech", "count": 2}'
 ```
 
 The response includes `run_id`; use it for expand and export so concurrent clients do not overwrite each other's state.
@@ -70,10 +69,12 @@ curl -X POST http://localhost:8000/export \
 
 **Export format (LLM-ready):** The markdown file includes (1) Context and goal (tech stack, problem, value, why-it-fits), (2) High-level implementation plan, (3) Detailed implementation plan (from expand), (4) Assumptions / Out of scope, (5) Next step (first concrete action). Designed so an LLM can execute the project from the file without hallucinating.
 
-**Example (CLI with options):**
+**Example (API with natural-language intent):**
 
 ```bash
-python scripts/run_graph.py "React, Node.js" --count 5 --domain fintech --level beginner --enable-multi-query
+curl -X POST http://localhost:8000/ideas \
+  -H "Content-Type: application/json" \
+  -d '{"intent": "Event-driven fintech backend with strong audit trails", "count": 2}'
 ```
 
 **Analyze a repository (Repository Intelligence):**
@@ -92,12 +93,12 @@ Returns `run_id`, evidence-backed `findings`, `recommendations`, and a structura
 
 ## Architecture
 
-### End-to-end flow
+### End-to-end flow (Ideas)
 
 ![Dev-Strom architecture flow](docs/architecture.png)
 
 ```
-User input: "LangChain, LangGraph"
+User input: intent or tech_stack
          │
          ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -107,20 +108,13 @@ User input: "LangChain, LangGraph"
 │    │                                                                     │
 │    ▼                                                                     │
 │  fetch_web_context(state)                                                │
-│    │  • Uses LangChain tool: web_search_project_ideas                    │
-│    │  • If enable_multi_query=true: runs 2-3 queries                     │
-│    │    ("project ideas", "tutorials", "example projects")               │
-│    │    and merges with fair per-query cap                              │
-│    │  • If enable_multi_query=false: single query (V1)                  │
-│    │  • Calls Tavily API                                                 │
+│    │  • Primary: Perplexity Sonar via OpenRouter (search_model)          │
+│    │  • Fallback: Tavily (app/tools.py) if Sonar fails                   │
 │    │  • Returns {"web_context": "..."}                                   │
 │    ▼                                                                     │
 │  generate_ideas(state)                                                   │
-│    │  • Builds user_content = tech_stack + web_context                   │
-│    │  • Invokes Deep Agent (LangGraph internally)                        │
-│    │  • Deep Agent: LLM call with middleware (e.g. logging)              │
-│    │  • Parses JSON → ProjectIdea objects                                │
-│    │  • Returns {"ideas": [...]}                                         │
+│    │  • Builds prompt from tech_stack/intent + web_context               │
+│    │  • Invokes Deep Agent → parses JSON → ProjectIdea objects             │
 │    ▼                                                                     │
 │  END                                                                     │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -131,10 +125,10 @@ Final state: {tech_stack, web_context, ideas}
 
 **Step-by-step:**
 
-1. **Input:** User provides a tech stack string (e.g. via UI, CLI, or API). Optional: `domain`, `level`, `enable_multi_query`, `count` (1–5).
-2. **fetch_web_context:** LangGraph node reads `tech_stack` and `enable_multi_query`. If multi-query enabled, runs 2–3 queries ("project ideas for {stack}", "{stack} tutorials", "{stack} example projects") with fair per-query character limits, then merges results. If disabled, runs single query (V1 behavior). Calls the LangChain web search tool (Tavily), writes snippets to `web_context` in state.
-3. **generate_ideas:** LangGraph node reads `tech_stack` and `web_context`, invokes the Deep Agent with a prompt; the agent returns JSON, which is parsed into `ProjectIdea` objects and written to `ideas` in state.
-4. **Output:** Final state contains `tech_stack`, `web_context`, and `ideas` (1–5 ideas per run, per requested count).
+1. **Input:** Natural-language `intent` and/or `tech_stack`, plus optional `domain`, `level`, `refinement_context`, `prior_ideas`.
+2. **fetch_web_context:** Calls `fetch_real_world_problems` — Sonar first, Tavily only on failure when `TAVILY_API_KEY` is set.
+3. **generate_ideas:** Deep Agent produces two grounded idea cards per run.
+4. **Output:** `run_id` + ideas persisted to Postgres.
 
 ### Repository Intelligence flow
 
@@ -163,25 +157,25 @@ Analysis + ProjectGraph  →  RepoIntelligence UI (web/)
 
 | Layer | Role |
 |-------|------|
-| **LangGraph** | Orchestration: state and node order (fetch_web_context → generate_ideas). |
-| **LangChain** | Web search tool and prompts. |
-| **Deep Agents** | Idea generation inside the `generate_ideas` node (with optional middleware). |
-| **Cartographer package** | Internal ingest/parse/findings pipeline (`app/cartographer/`); powers `POST /analyze`. |
-
-**Output schema** (`schema.py`): Each idea has `name`, `problem_statement`, `why_it_fits` (list), `real_world_value`, `implementation_plan` (list of steps). 1–5 ideas per run (configurable). API returns a `run_id` (UUID) with each ideas response; use it for `POST /expand` and `POST /export` so state is per-run and safe for concurrent clients.
+| **LangGraph** | Orchestration: `fetch_web_context` → `generate_ideas`. |
+| **Sonar (OpenRouter)** | Primary live web context for idea generation (`DEVSTROM_SEARCH_MODEL`). |
+| **Tavily** | Fallback web search when Sonar fails (`app/tools.py`, requires `TAVILY_API_KEY`). |
+| **LangChain** | Tool wrapper for Tavily fallback. |
+| **Deep Agents** | Idea generation inside the `generate_ideas` node. |
+| **Cartographer package** | Internal ingest/parse/findings pipeline (`app/cartographer/`); powers `POST /analyze`. | (`schema.py`): Each idea has `name`, `problem_statement`, `why_it_fits` (list), `real_world_value`, `implementation_plan` (list of steps). 1–5 ideas per run (configurable). API returns a `run_id` (UUID) with each ideas response; use it for `POST /expand` and `POST /export` so state is per-run and safe for concurrent clients.
 
 ---
 
 ## Project layout
 
 Application code lives under `app/` (FastAPI server, LangGraph pipeline, database
-services) and `web/` (React frontend). `scripts/` holds standalone CLI entry
-points; `migrations/` holds Alembic migrations.
+services) and `web/` (React frontend). `migrations/` holds Alembic migrations.
 
 | Path | Purpose |
 |------|---------|
 | `app/graph.py` | LangGraph pipeline: state, `fetch_web_context`, `generate_ideas`, `expand_idea`, model fallback chain. |
-| `app/tools.py` | LangChain web search tool (Tavily). |
+| `app/tools.py` | Tavily web-search fallback tool (used when Sonar fails). |
+| `app/services/web_context.py` | Sonar-first web context fetch for idea generation. |
 | `app/api.py` | FastAPI server: ideas (`POST /ideas`, `/expand`, `/export`, `/history`), repository intelligence (`POST /analyze`, `GET /analyze/{run_id}`, `GET /analyses`), jobs (`GET /jobs/{job_id}`), health. |
 | `app/cartographer/` | Internal repo-ingest pipeline: `ingest`, `parse`, `aggregate`, `findings`, `analysis_store`, `pipeline`. |
 | `app/config.py` | Typed settings (`pydantic-settings`): API keys, `DATABASE_URL`, model + fallbacks, LangSmith config, log level. |
@@ -192,8 +186,6 @@ points; `migrations/` holds Alembic migrations.
 | `app/services/run_service.py` | Run/expansion persistence: `save_run`, `save_expanded_idea`, `get_latest_expansion`, `load_history`, `get_run`. |
 | `app/services/export_formatter.py` | Idea + extended plan → LLM-ready Markdown for download. |
 | `web/` | React + Vite frontend: Ideas, Repository Intelligence, History. See [web/README.md](web/README.md). |
-| `scripts/run_graph.py` | CLI entry point with `--stream` and `--debug` flags. |
-| `scripts/test_web_search.py` | Smoke-tests the Tavily search tool in isolation. |
 | `migrations/` | Alembic migration environment and versions (`001_initial_schema.py`, ...). |
 | `docs/PLAN.md` | Master architecture plan and roadmap. |
 | `docs/V3_TICKETS.md` | V3 Jira-style tickets. |
@@ -242,9 +234,10 @@ The `web_chunks` table (`pgvector` embedding column, `app/services/models.py`)
 and its `ivfflat` index are created by migration `001_initial_schema.py`, but
 the RAG pipeline itself is **not wired up yet**: nothing writes embeddings
 into `web_chunks`, and the LangGraph pipeline (`app/graph.py`) has no
-retrieval node that reads from it. Web context currently comes only from the
-live Tavily search in `fetch_web_context` (`app/tools.py`). Treat
-`web_chunks` as scaffolding for a future ticket, not a working feature.
+retrieval node that reads from it. Web context for ideas comes from Perplexity
+Sonar via OpenRouter (`app/services/web_context.py`), with Tavily as a fallback
+when Sonar fails. Treat `web_chunks` as scaffolding for a future ticket, not a
+working feature.
 
 ---
 

@@ -21,7 +21,10 @@ class IdeasRequest(BaseModel):
     tech_stack: str | None = None
     domain: str | None = None
     level: str | None = None
-    enable_multi_query: bool = False
+    enable_multi_query: bool = Field(
+        default=False,
+        description="Deprecated — no longer affects web context (Sonar + Tavily fallback). Stored on runs for history only.",
+    )
     count: int = Field(default=2, ge=1, le=5)
     refinement_context: str | None = Field(
         default=None, description="Optional extra context when generating more ideas"

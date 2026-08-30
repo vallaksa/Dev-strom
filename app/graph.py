@@ -36,7 +36,6 @@ class DevStromStateOptional(TypedDict, total=False):
     intent: str
     domain: str
     level: str
-    enable_multi_query: bool
     count: int
     refinement_context: str
     prior_ideas: list[dict]

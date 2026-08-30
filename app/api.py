@@ -96,8 +96,6 @@ def post_ideas(body: IdeasRequest):
         inputs["domain"] = body.domain.strip()
     if body.level and body.level.strip():
         inputs["level"] = body.level.strip()
-    if body.enable_multi_query:
-        inputs["enable_multi_query"] = True
     if body.refinement_context and body.refinement_context.strip():
         inputs["refinement_context"] = body.refinement_context.strip()
     if body.prior_ideas:

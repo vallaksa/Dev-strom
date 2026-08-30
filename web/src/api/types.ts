@@ -17,7 +17,7 @@ export interface IdeasRequest {
   tech_stack?: string;
   domain?: string;
   level?: string;
-  enable_multi_query?: boolean;
+  enable_multi_query?: boolean; /** @deprecated No longer affects web context */
 }
 
 export interface Idea {
