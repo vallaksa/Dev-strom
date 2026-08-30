@@ -13,20 +13,34 @@ const EXAMPLES = [
 
 export function IdeasPage() {
   const [intent, setIntent] = useState("");
-  const [count, setCount] = useState(3);
+  const [refinementContext, setRefinementContext] = useState("");
+  const [showRefinement, setShowRefinement] = useState(false);
 
   const [state, run] = useIdeaGeneration();
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const submitIntent = (refinement?: string) => {
     const trimmed = intent.trim();
     if (!trimmed) return;
-    // Send `intent` (the NL-first input) and mirror it into `tech_stack` for
-    // backward compatibility: a backend that predates the `intent` field still
-    // requires tech_stack, and the new backend backfills tech_stack = intent
-    // itself — so both branches behave identically and merge order is moot.
-    run({ intent: trimmed, tech_stack: trimmed, count });
+    run({
+      intent: trimmed,
+      tech_stack: trimmed,
+      refinement_context: refinement?.trim() || undefined,
+    });
   };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    submitIntent();
+  };
+
+  const handleGenerateMore = () => {
+    submitIntent(showRefinement ? refinementContext : undefined);
+  };
+
+  const totalIdeas =
+    state.status === "success"
+      ? state.batches.reduce((n, b) => n + b.ideas.length, 0)
+      : 0;
 
   return (
     <div className="ideas-page">
@@ -34,8 +48,8 @@ export function IdeasPage() {
       <h1>What do you want to build?</h1>
       <p className="ideas-page__lede">
         Describe what you're after in plain language — a stack, a domain, the kind of challenge
-        you want. Dev-Strom infers the rest and drafts project opportunities that teach engineering,
-        not just fill a repo.
+        you want. Dev-Strom finds real-world problems from the live web and drafts two project
+        opportunities per generation.
       </p>
 
       <form className="ideas-form card" onSubmit={handleSubmit}>
@@ -68,18 +82,6 @@ export function IdeasPage() {
         </div>
 
         <div className="ideas-form__footer">
-          <label className="ideas-form__count field">
-            <span>Ideas</span>
-            <input
-              id="count"
-              type="number"
-              min={1}
-              max={5}
-              className="input"
-              value={count}
-              onChange={(e) => setCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
-            />
-          </label>
           <button
             type="submit"
             className="btn btn-primary"
@@ -90,18 +92,62 @@ export function IdeasPage() {
         </div>
       </form>
 
-      <div className="ideas-page__results">
-        {state.status === "loading" && <LoadingState label="Understanding intent and drafting opportunities" />}
+      {state.status === "success" && (
+        <div className="ideas-form card ideas-form--more">
+          <button
+            type="button"
+            className="ideas-form__toggle-refine"
+            onClick={() => setShowRefinement((v) => !v)}
+          >
+            {showRefinement ? "Hide context" : "Add context (optional)"}
+          </button>
+          {showRefinement && (
+            <div className="field">
+              <label htmlFor="refinement">Refine this generation</label>
+              <textarea
+                id="refinement"
+                className="input ideas-form__intent"
+                value={refinementContext}
+                onChange={(e) => setRefinementContext(e.target.value)}
+                placeholder="e.g. focus on event-driven architecture, beginner-friendly, or serverless only"
+                rows={3}
+              />
+            </div>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleGenerateMore}
+            disabled={state.status === "loading" || !intent.trim()}
+          >
+            Generate more
+          </button>
+        </div>
+      )}
+
+      <div className="ideas-page__results ideas-page__results--scroll">
+        {state.status === "loading" && (
+          <LoadingState label="Searching for real-world problems and drafting opportunities" />
+        )}
         {state.status === "error" && <ErrorState message={state.error} />}
         {state.status === "success" && (
           <>
             <hr className="hr" />
-            <SectionMarker index="II" label={`${state.data.ideas.length} Ideas · ${state.data.run_id}`} />
-            <div className="ideas-grid">
-              {state.data.ideas.map((idea) => (
-                <IdeaCard key={idea.pid} idea={idea} runId={state.data.run_id} />
-              ))}
-            </div>
+            <SectionMarker index="II" label={`${totalIdeas} Ideas`} />
+            {state.batches.map((batch) => (
+              <section key={batch.batchId} className="ideas-batch">
+                <p className="ideas-batch__label mono-label">{batch.label}</p>
+                <div className="ideas-grid">
+                  {batch.ideas.map((idea) => (
+                    <IdeaCard
+                      key={`${batch.runId}-${idea.pid}`}
+                      idea={idea}
+                      runId={batch.runId}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
           </>
         )}
       </div>
