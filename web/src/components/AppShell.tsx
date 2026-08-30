@@ -5,10 +5,10 @@ import { useIdeaGeneration } from "../hooks/useIdeaGeneration";
 import "./AppShell.css";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Ideas", index: "I" },
-  { to: "/cartographer", label: "Cartographer", index: "II" },
-  { to: "/advisor", label: "Advisor", index: "III" },
-  { to: "/history", label: "History", index: "IV" },
+  { to: "/", label: "Ideas" },
+  { to: "/cartographer", label: "Cartographer" },
+  { to: "/advisor", label: "Advisor" },
+  { to: "/history", label: "History" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -39,7 +39,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                   (item.to === "/" && generating ? " is-busy" : "")
                 }
               >
-                <span className="app-shell__nav-index">{item.index}</span>
                 {item.to === "/" && generating ? "Generating…" : item.label}
               </NavLink>
             ))}

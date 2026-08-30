@@ -72,10 +72,6 @@
   transition: color 120ms ease, border-color 120ms ease;
 }
 
-.app-shell__nav-index {
-  color: var(--accent-soft);
-}
-
 .app-shell__nav-link:hover {
   color: var(--ink);
 }
@@ -85,15 +81,7 @@
   border-bottom-color: var(--accent);
 }
 
-.app-shell__nav-link.is-active .app-shell__nav-index {
-  color: var(--accent);
-}
-
 .app-shell__nav-link.is-busy {
-  color: var(--accent);
-}
-
-.app-shell__nav-link.is-busy .app-shell__nav-index {
   color: var(--accent);
 }
 

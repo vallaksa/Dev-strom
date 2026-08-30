@@ -8,7 +8,7 @@ import { sampleProjectGraph } from "./projectGraph";
  * and impact/priority-ranked recommendations linked back to findings).
  */
 export const sampleAnalysis: Analysis = {
-  run_id: "demo-analysis-run-0001",
+  run_id: "example-org-dev-strom",
   id: "demo-analysis-0001",
   status: "complete",
   created_at: "2026-08-20T15:12:00Z",
@@ -258,7 +258,7 @@ export const sampleAnalysisHistory: AnalysisHistoryResponse = {
       created_at: sampleAnalysis.created_at,
     },
     {
-      run_id: "demo-analysis-run-0002",
+      run_id: "example-org-payment-platform",
       repo_url: "https://github.com/example-org/payment-platform",
       language: "TypeScript",
       status: "complete",
@@ -267,7 +267,7 @@ export const sampleAnalysisHistory: AnalysisHistoryResponse = {
       created_at: "2026-08-18T09:30:00Z",
     },
     {
-      run_id: "demo-analysis-run-0003",
+      run_id: "example-org-legacy-monolith",
       repo_url: "https://github.com/example-org/legacy-monolith",
       language: "Java",
       status: "failed",

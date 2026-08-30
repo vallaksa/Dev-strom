@@ -9,7 +9,7 @@ export async function postIdeas(body: IdeasRequest): Promise<IdeasResponse> {
     const count = Math.max(1, Math.min(5, body.count || sampleIdeas.length));
     return demoDelay(
       {
-        run_id: `demo-run-${Date.now()}`,
+        run_id: "python-fastapi-react",
         ideas: sampleIdeas.slice(0, count).map((idea, i) => ({ ...idea, pid: i + 1 })),
       },
       1800,

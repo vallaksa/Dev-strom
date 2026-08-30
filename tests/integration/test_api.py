@@ -72,11 +72,11 @@ def test_ideas_requires_intent_or_tech_stack_returns_422(client):
     assert resp.status_code == 422
 
 
-def test_ideas_missing_openai_key_returns_503(client, monkeypatch):
+def test_ideas_missing_llm_key_returns_503(client, monkeypatch):
     # The 503 guard reads app.config.settings (a cached pydantic-settings
-    # singleton), not os.environ directly, so patch the settings field
-    # itself rather than the environment.
-    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+    # singleton), not os.environ directly, so patch the settings fields
+    # themselves rather than the environment.
+    monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
     assert resp.status_code == 503
 
@@ -175,10 +175,10 @@ def test_expand_happy_path(client, monkeypatch, sample_run):
     assert body["extended_plan"] == ["Step 1: do x", "Step 2: do y"]
 
 
-def test_expand_missing_openai_key_returns_503(client, monkeypatch, sample_run):
+def test_expand_missing_llm_key_returns_503(client, monkeypatch, sample_run):
     # As above: patch the settings singleton so the 503 guard actually
     # triggers, before the endpoint ever reaches get_run()/the database.
-    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+    monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/expand", json={"run_id": sample_run["run_id"], "pid": 1})
     assert resp.status_code == 503
 

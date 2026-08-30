@@ -35,12 +35,12 @@ class IdeasRequest(BaseModel):
 
 
 class ExpandRequest(BaseModel):
-    run_id: str = Field(..., description="Run ID from POST /ideas response")
+    run_id: str = Field(..., description="Public run slug from POST /ideas")
     pid: int = Field(..., ge=1, description="ID of the idea to expand (1-based from that run)")
 
 
 class ExportRequest(BaseModel):
-    run_id: str = Field(..., description="Run ID from POST /ideas response")
+    run_id: str = Field(..., description="Public run slug from POST /ideas")
     pid: int = Field(..., ge=1, description="ID of the expanded idea to export (must have been expanded first)")
 
 
@@ -132,7 +132,7 @@ class AnalysisListResponse(BaseModel):
 class AdviseRequest(BaseModel):
     repo_url: str | None = Field(default=None, description="Git URL of the repo to map and advise on")
     path: str | None = Field(default=None, description="Local filesystem path to the repo to map and advise on")
-    run_id: str | None = Field(default=None, description="An existing cartograph run ID to advise against")
+    run_id: str | None = Field(default=None, description="Slug of an existing analysis or cartograph run to advise against")
 
     @model_validator(mode="after")
     def _exactly_one_source(self) -> "AdviseRequest":

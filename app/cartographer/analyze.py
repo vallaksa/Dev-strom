@@ -27,6 +27,7 @@ from deepagents import create_deep_agent
 
 from app.config import settings
 from app.graph import _extract_last_content, _invoke_with_fallback, _strip_markdown_fences
+from app.llm import chat_model
 
 if TYPE_CHECKING:  # pragma: no cover - typing only, module may not exist yet
     from app.cartographer.model import ArchitectureReport, ProjectGraph
@@ -111,7 +112,7 @@ concise architecture report.
 def _get_analyze_agent(model: str = MODEL):
     return create_deep_agent(
         name="architecture_analyst",
-        model=model,
+        model=chat_model(model),
         tools=[],
         system_prompt=_ANALYZE_SYSTEM,
     )

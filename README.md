@@ -19,9 +19,8 @@ Edit `.env` and set:
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | Yes | For the idea-generation agent ([OpenAI](https://platform.openai.com/api-keys)) |
+| `API_KEY` | Yes | LLM provider key (OpenAI-compatible, e.g. OpenRouter) |
 | `TAVILY_API_KEY` | Yes | For web search ([Tavily](https://tavily.com)) |
-| `API_BASE_URL` | No | FastAPI base URL for Streamlit (default: `http://localhost:8000`) |
 | `DATABASE_URL` | V3+ | PostgreSQL connection string (see [Database setup](#database-setup-v3)) |
 
 ---
@@ -30,13 +29,13 @@ Edit `.env` and set:
 
 | Option | Command | Description |
 |--------|---------|-------------|
-| **UI** | `streamlit run ui/Home.py` | Browser UI on port 8501. Requires FastAPI to be running first. |
-| **API** | `uvicorn app.api:api --reload` | HTTP server on port 8000. Must be running for the UI to work. |
+| **Web UI** | `cd web && npm install && npm run dev` | React app on port 5173. Proxies `/api/*` to FastAPI — start the API first. |
+| **API** | `uvicorn app.api:api --reload` | HTTP server on port 8000. Required for the web UI and CLI. |
 | **CLI** | `python scripts/run_graph.py "LangChain, LangGraph"` | Prints ideas to the terminal. Optional: `--count` (1–5), `--domain`, `--level`, `--enable-multi-query`, `--stream`, `--debug`. |
 
 `GET /health` (liveness) and `GET /ready` (readiness — pings the database when `DATABASE_URL` is configured) are available once the API is running.
 
-> **Note:** From V3-1 onwards, Streamlit calls FastAPI over HTTP. You must start **both** servers.
+> **Note:** Start the **API** and **web** dev server in separate terminals. See [web/README.md](web/README.md) for frontend details (demo mode, build, Cartographer graph).
 
 **Example (API):**
 
@@ -138,7 +137,7 @@ Final state: {tech_stack, web_context, ideas}
 ## Project layout
 
 Application code lives under `app/` (FastAPI server, LangGraph pipeline, database
-services) and `ui/` (Streamlit frontend). `scripts/` holds standalone CLI entry
+services) and `web/` (React frontend). `scripts/` holds standalone CLI entry
 points; `migrations/` holds Alembic migrations.
 
 | Path | Purpose |
@@ -153,10 +152,7 @@ points; `migrations/` holds Alembic migrations.
 | `app/services/models.py` | SQLAlchemy ORM models: `User`, `Run`, `ExpandedIdea` (and `web_chunks`, scaffolded — see [RAG status](#rag-status-web_chunks) below). |
 | `app/services/run_service.py` | Run/expansion persistence: `save_run`, `save_expanded_idea`, `get_latest_expansion`, `load_history`, `get_run`. |
 | `app/services/export_formatter.py` | Idea + extended plan → LLM-ready Markdown for download. |
-| `ui/Home.py` | Streamlit UI entry point: generate, expand, download. |
-| `ui/api_client.py` | HTTP client used by Streamlit to call FastAPI. |
-| `ui/components.py` | Shared Streamlit UI components. |
-| `ui/pages/` | Additional Streamlit pages (e.g. History). |
+| `web/` | React + Vite frontend: Ideas, Cartographer, Advisor, History. See [web/README.md](web/README.md). |
 | `scripts/run_graph.py` | CLI entry point with `--stream` and `--debug` flags. |
 | `scripts/test_web_search.py` | Smoke-tests the Tavily search tool in isolation. |
 | `migrations/` | Alembic migration environment and versions (`001_initial_schema.py`, ...). |
@@ -233,16 +229,15 @@ CI (`.github/workflows/ci.yml`) runs `ruff check`, `mypy` (non-blocking), `pytes
 
 ## Docker
 
-Run the full stack (Postgres + FastAPI + Streamlit) with Docker Compose:
+Run the API and database stack with Docker Compose:
 
 ```bash
-cp .env.example .env   # fill in OPENAI_API_KEY / TAVILY_API_KEY
+cp .env.example .env   # fill in API_KEY / TAVILY_API_KEY
 docker compose up --build
 ```
 
 This starts `db` (Postgres with pgvector), a one-shot `migrate` service that runs `alembic upgrade head`
-before anything else starts, `api` (FastAPI on `:8000`), and `ui` (Streamlit on `:8501`, wired to talk to
-`api` over the compose network via `API_BASE_URL=http://api:8000`). Neo4j is not part of this compose file;
+before anything else starts, and `api` (FastAPI on `:8000`). Run the React dev server separately from `web/` (`npm run dev`, port 5173). Neo4j is not part of this compose file;
 on the server it runs as a standalone Docker daemon on `global-network` next to Postgres (see
 [Project Cartographer / Neo4j](#project-cartographer--neo4j)). Validate the compose file without a running
 daemon via `docker compose config`.

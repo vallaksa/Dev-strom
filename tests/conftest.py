@@ -5,7 +5,7 @@ is imported anywhere in the suite. `app/services/db.py` currently reads
 `os.environ["DATABASE_URL"]` at import time (it will build a SQLAlchemy
 engine lazily but does not open a real connection until a query runs), so a
 dummy connection string here is enough to make every module importable
-without a real Postgres instance, an OPENAI_API_KEY, or a TAVILY_API_KEY.
+without a real Postgres instance, an API_KEY, or a TAVILY_API_KEY.
 No test in this suite makes a real network or database call - the LLM
 graph, the web-search tool, and the run_service/DB layer are always
 monkeypatched in the tests that need them.
@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/devstrom_test")
-os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
+os.environ.setdefault("API_KEY", "test-api-key")
 os.environ.setdefault("TAVILY_API_KEY", "test-tavily-key")
 
 import pytest  # noqa: E402

@@ -29,7 +29,6 @@ ignore = ["E501"]
 # modules that read env vars at import time. Out of scope for this branch
 # (P0-4/P0-5 devex work only) - not app/ business logic.
 "app/api.py" = ["E402"]
-"ui/Home.py" = ["E402"]
 "migrations/env.py" = ["E402"]
 "scripts/*.py" = ["E402"]
 # Pre-existing unused imports in app/services/, out of scope for this branch.

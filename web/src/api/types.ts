@@ -294,8 +294,8 @@ export interface AnalysisRepository {
 
 export interface Analysis {
   /**
-   * Persisted row id — the key History reloads against (GET /analyze/{run_id}).
-   * Distinct from the inner analysis `id`.
+   * Public slug — the key History reloads against (GET /analyze/{run_id}).
+   * Distinct from the inner analysis `id` (UUID).
    */
   run_id: string;
   id: string;

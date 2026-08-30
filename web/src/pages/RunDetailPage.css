@@ -17,7 +17,7 @@
 
 .run-detail-page__meta {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 1fr auto;
   gap: var(--space-4);
   margin: var(--space-6) 0;
 }

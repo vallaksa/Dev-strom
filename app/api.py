@@ -6,7 +6,6 @@ operations use the ANONYMOUS_USER_ID.
 """
 
 import logging
-import uuid
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
@@ -121,10 +120,10 @@ api = FastAPI(title="Dev-Strom")
 @api.post("/ideas")
 def post_ideas(body: IdeasRequest):
     """Generate project ideas and persist the run to the database."""
-    if not settings.openai_api_key or not settings.tavily_api_key:
+    if not settings.api_key or not settings.tavily_api_key:
         raise HTTPException(
             status_code=503,
-            detail="Set OPENAI_API_KEY and TAVILY_API_KEY in .env",
+            detail="Set API_KEY and TAVILY_API_KEY in .env",
         )
 
     intent = body.intent.strip() if body.intent and body.intent.strip() else None
@@ -185,7 +184,8 @@ def post_ideas(body: IdeasRequest):
         )
     except Exception:
         logger.exception("Failed to persist idea run; returning generated ideas anyway")
-        run_id = str(uuid.uuid4())
+        from app.services.slugs import slugify
+        run_id = slugify(effective_stack)
 
     return {"ideas": out, "run_id": run_id}
 
@@ -195,10 +195,10 @@ def post_ideas(body: IdeasRequest):
 @api.post("/expand")
 def post_expand(body: ExpandRequest):
     """Expand a single idea into a deeper implementation plan."""
-    if not settings.openai_api_key:
+    if not settings.api_key:
         raise HTTPException(
             status_code=503,
-            detail="Set OPENAI_API_KEY in .env",
+            detail="Set API_KEY in .env",
         )
 
     # Load run from database
@@ -350,10 +350,10 @@ def post_cartograph(
     `{job_id, status}` immediately (202); poll GET /jobs/{job_id} for the
     result.
     """
-    if not settings.openai_api_key:
+    if not settings.api_key:
         raise HTTPException(
             status_code=503,
-            detail="Set OPENAI_API_KEY in .env",
+            detail="Set API_KEY in .env",
         )
     if cartograph is None or analyze_architecture is None or save_cartograph_run is None:
         raise HTTPException(
@@ -444,10 +444,10 @@ def post_advise(
     get back `{job_id, status}` immediately (202); poll GET /jobs/{job_id}
     for the result.
     """
-    if not settings.openai_api_key:
+    if not settings.api_key:
         raise HTTPException(
             status_code=503,
-            detail="Set OPENAI_API_KEY in .env",
+            detail="Set API_KEY in .env",
         )
     if advise_repo_with_context is None or save_advisor_run is None:
         raise HTTPException(
@@ -539,8 +539,8 @@ def post_analyze(
     `?async=true` to schedule it as a background job and get back
     `{job_id, status}` immediately (202); poll GET /jobs/{job_id}.
     """
-    if not settings.openai_api_key:
-        raise HTTPException(status_code=503, detail="Set OPENAI_API_KEY in .env")
+    if not settings.api_key:
+        raise HTTPException(status_code=503, detail="Set API_KEY in .env")
     if analyze_repository_with_graph is None or save_analysis_run is None:
         raise HTTPException(
             status_code=503,

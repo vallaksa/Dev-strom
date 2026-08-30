@@ -5,7 +5,7 @@ import { sampleProjectGraph } from "../fixtures/projectGraph";
 import { isDemoMode } from "../lib/demoMode";
 import type { CartographRequest, CartographResponse } from "./types";
 
-const DEMO_RUN_ID = "demo-run-cartograph-0001";
+const DEMO_RUN_ID = "example-org-dev-strom";
 
 export async function postCartograph(body: CartographRequest): Promise<CartographResponse> {
   if (isDemoMode()) {

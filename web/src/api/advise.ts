@@ -4,7 +4,7 @@ import { sampleAdvisorReport } from "../fixtures/advisorReport";
 import { isDemoMode } from "../lib/demoMode";
 import type { AdviseRequest, AdviseResponse } from "./types";
 
-const DEMO_RUN_ID = "demo-run-advise-0001";
+const DEMO_RUN_ID = "example-org-dev-strom-advice";
 
 export async function postAdvise(body: AdviseRequest): Promise<AdviseResponse> {
   if (isDemoMode()) {

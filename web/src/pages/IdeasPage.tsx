@@ -96,7 +96,7 @@ export function IdeasPage() {
         {state.status === "success" && (
           <>
             <hr className="hr" />
-            <SectionMarker index="II" label={`${state.data.ideas.length} Ideas · Run ${state.data.run_id.slice(0, 8)}`} />
+            <SectionMarker index="II" label={`${state.data.ideas.length} Ideas · ${state.data.run_id}`} />
             <div className="ideas-grid">
               {state.data.ideas.map((idea) => (
                 <IdeaCard key={idea.pid} idea={idea} runId={state.data.run_id} />

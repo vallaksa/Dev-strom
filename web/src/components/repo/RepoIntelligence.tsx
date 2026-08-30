@@ -55,7 +55,7 @@ export function RepoIntelligence({ analysis }: { analysis: Analysis }) {
         </div>
         <div className="repo-intel__status">
           <span className="badge badge-accent">Analysis complete</span>
-          <span className="mono-label repo-intel__runid">Run {analysis.run_id.slice(0, 12)}</span>
+          <span className="mono-label repo-intel__runid">{analysis.run_id}</span>
         </div>
       </div>
 

@@ -3,6 +3,8 @@
 > Work through tickets in order. Each ticket is self-contained with a concept explanation inside the Description, acceptance criteria, and plain-English instructions. Mark `[ ]` → `[x]` when done.
 > **V3-1, V3-2, V3-3** are hard prerequisites — complete them before anything else.
 > Until auth is implemented, all features use a hardcoded anonymous user UUID.
+>
+> **Note (2026-08-26):** Legacy Streamlit UI (`ui/`) removed; React app in `web/` is the frontend. Ticket titles below retain original Streamlit wording.
 
 ---
 
