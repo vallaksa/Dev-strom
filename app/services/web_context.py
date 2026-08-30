@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from app.config import settings
-from app.llm import chat_model, search_model_name
+from app.llm import chat_model
 from app.tools import web_search_project_ideas
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def _fetch_via_sonar(intent: str) -> str:
     if not settings.api_key:
         return ""
 
-    model = search_model_name()
+    model = settings.search_model
     try:
         llm = chat_model(model)
         response = llm.invoke(

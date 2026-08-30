@@ -91,6 +91,25 @@ def test_ideas_works_without_tavily_key(client, monkeypatch):
     assert len(resp.json()["ideas"]) == 2
 
 
+def test_ideas_passes_prior_ideas_to_graph(client, monkeypatch):
+    fake_graph = _CapturingGraphApp({"ideas": [make_idea(1), make_idea(2)], "web_context": "ctx"})
+    monkeypatch.setattr(api_module, "graph_app", fake_graph)
+    monkeypatch.setattr(api_module, "save_run", lambda **kwargs: "run-prior")
+
+    resp = client.post(
+        "/ideas",
+        json={
+            "intent": "event-driven backend",
+            "prior_ideas": [
+                {"name": "Idea 1", "problem_statement": "Already shown problem."},
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    assert fake_graph.inputs["prior_ideas"][0]["name"] == "Idea 1"
+
+
 def test_ideas_passes_refinement_context_to_graph(client, monkeypatch):
     fake_graph = _CapturingGraphApp({"ideas": [make_idea(1), make_idea(2)], "web_context": "ctx"})
     monkeypatch.setattr(api_module, "graph_app", fake_graph)
@@ -103,6 +122,27 @@ def test_ideas_passes_refinement_context_to_graph(client, monkeypatch):
 
     assert resp.status_code == 200
     assert fake_graph.inputs["refinement_context"] == "beginner-friendly"
+
+
+def test_expand_persists_implementation_plan_on_run(client, monkeypatch, sample_run):
+    saved = {}
+
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(
+        api_module,
+        "graph_expand_idea",
+        lambda idea: {
+            "idea": {**idea, "implementation_plan": ["Step 1: build"]},
+            "extended_plan": ["x"],
+        },
+    )
+    monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: saved.update(kwargs) or "exp-1")
+    monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: saved.update({"update": kwargs}))
+
+    resp = client.post("/expand", json={"run_id": sample_run["run_id"], "pid": 1})
+
+    assert resp.status_code == 200
+    assert saved["update"]["idea"]["implementation_plan"] == ["Step 1: build"]
 
 
 def test_ideas_does_not_500_on_over_generation(client, monkeypatch):
@@ -180,6 +220,7 @@ def test_ideas_does_not_500_on_under_generation(client, monkeypatch):
 def test_expand_happy_path(client, monkeypatch, sample_run):
     monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
     monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: "expanded-1")
+    monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: None)
     monkeypatch.setattr(
         api_module,
         "graph_expand_idea",
@@ -223,6 +264,7 @@ def test_export_current_behavior_returns_markdown_with_attachment_header(client,
     monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
     monkeypatch.setattr(api_module, "get_latest_expansion", lambda *, run_id, pid: None)
     monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: "expanded-1")
+    monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: None)
     monkeypatch.setattr(
         api_module,
         "graph_expand_idea",

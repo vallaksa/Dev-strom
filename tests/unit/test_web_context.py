@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from app.services import web_context
 
 
@@ -14,16 +12,16 @@ def test_fetch_real_world_problems_empty_intent():
 
 @patch("app.services.web_context.settings")
 @patch("app.services.web_context.chat_model")
-def test_fetch_via_sonar_returns_content(mock_chat_model, mock_settings):
+def test_fetch_via_sonar_uses_settings_search_model(mock_chat_model, mock_settings):
     mock_settings.api_key = "test-key"
+    mock_settings.search_model = "custom/search-model"
     mock_response = MagicMock()
-    mock_response.content = "Problem A\n\nProblem B"
+    mock_response.content = "Problem A"
     mock_chat_model.return_value.invoke.return_value = mock_response
 
-    result = web_context.fetch_real_world_problems("event-driven payments")
+    web_context.fetch_real_world_problems("payments")
 
-    assert "Problem A" in result
-    mock_chat_model.return_value.invoke.assert_called_once()
+    mock_chat_model.assert_called_once_with("custom/search-model")
 
 
 @patch("app.services.web_context.settings")

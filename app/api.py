@@ -32,6 +32,7 @@ from app.services.run_service import (
     load_history,
     save_expanded_idea,
     save_run,
+    update_run_idea,
 )
 
 # ── Project Cartographer (F1) ────────────────────────────────────────────────
@@ -141,6 +142,11 @@ def post_ideas(body: IdeasRequest):
         inputs["enable_multi_query"] = True
     if body.refinement_context and body.refinement_context.strip():
         inputs["refinement_context"] = body.refinement_context.strip()
+    if body.prior_ideas:
+        inputs["prior_ideas"] = [
+            {"name": p.name, "problem_statement": p.problem_statement}
+            for p in body.prior_ideas
+        ]
 
     result = graph_app.invoke(inputs)
     ideas = result.get("ideas", [])
@@ -214,7 +220,9 @@ def post_expand(body: ExpandRequest):
     idea.pop("pid", None)
     result = graph_expand_idea(idea)
 
-    # Persist expanded idea to database
+    expanded_idea = result.get("idea", idea)
+    update_run_idea(run_id=body.run_id, pid=body.pid, idea=expanded_idea)
+
     save_expanded_idea(
         run_id=body.run_id,
         pid=body.pid,
@@ -254,6 +262,10 @@ def post_export(body: ExportRequest):
     latest = get_latest_expansion(run_id=body.run_id, pid=body.pid)
     if latest is not None:
         extended_plan = latest["extended_plan"]
+        run = get_run(run_id=body.run_id)
+        assert run is not None
+        idea = run["ideas"][body.pid - 1].copy()
+        idea.pop("pid", None)
     else:
         logger.info(
             "No persisted expansion for run_id=%s pid=%s; expanding on demand.",
@@ -261,6 +273,8 @@ def post_export(body: ExportRequest):
         )
         expanded = graph_expand_idea(idea)
         extended_plan = expanded.get("extended_plan", [])
+        idea = expanded.get("idea", idea)
+        update_run_idea(run_id=body.run_id, pid=body.pid, idea=idea)
         save_expanded_idea(
             run_id=body.run_id,
             pid=body.pid,

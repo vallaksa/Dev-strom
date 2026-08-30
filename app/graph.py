@@ -39,6 +39,7 @@ class DevStromStateOptional(TypedDict, total=False):
     enable_multi_query: bool
     count: int
     refinement_context: str
+    prior_ideas: list[dict]
 
 
 class DevStromState(DevStromStateRequired, DevStromStateOptional):
@@ -283,6 +284,18 @@ def generate_ideas(state: DevStromState) -> dict:
             f"User refinement (additional context for this generation): {refinement}\n"
             "Shape the ideas according to this refinement while staying grounded in the web context."
         )
+    if prior := state.get("prior_ideas"):
+        lines = [
+            f"- {p.get('name', '')}: {p.get('problem_statement', '')}"
+            for p in prior
+            if isinstance(p, dict) and p.get("name")
+        ]
+        if lines:
+            parts.append(
+                "Ideas already generated in this session (must NOT repeat or closely paraphrase):\n"
+                + "\n".join(lines)
+                + "\nProduce two NEW ideas with distinct problems and titles."
+            )
     if domain := state.get("domain"):
         parts.append(f"Domain (bias ideas toward): {domain}")
     if level := state.get("level"):

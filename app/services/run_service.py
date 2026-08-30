@@ -50,6 +50,20 @@ def _run_or_raise(session: Session, run_id: str) -> Run:
     return run
 
 
+def update_run_idea(*, run_id: str, pid: int, idea: dict) -> None:
+    """Merge fields into one idea position inside a persisted run."""
+    with get_session() as session:
+        run = _run_or_raise(session, run_id)
+        ideas = list(run.ideas)
+        idx = pid - 1
+        if idx < 0 or idx >= len(ideas):
+            raise ValueError(f"Invalid pid {pid} for run {run_id}.")
+        merged = {**ideas[idx], **idea}
+        merged["pid"] = pid
+        ideas[idx] = merged
+        run.ideas = ideas
+
+
 def save_expanded_idea(
     *,
     run_id: str,
