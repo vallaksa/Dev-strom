@@ -9,10 +9,9 @@ explanation. Findings that cite nothing are the smell this design exists to
 avoid, so the prompt demands evidence and the parser preserves it.
 
 It reuses the same deep-agent + MODEL/MODEL_FALLBACKS + markdown-fence-stripping
-machinery as `app.cartographer.analyze` (which produces the free-form
-`ArchitectureReport`); this module is the *structured*, domain-model-shaped
-counterpart producing `app.models.domain` objects. Like `analyze`, it is
-hermetic/mockable: `parse_analysis` never raises, and callers/tests can
+machinery as other cartographer LLM passes; this module is the *structured*,
+domain-model-shaped analysis producing `app.models.domain` objects. Like other
+parsers here, `parse_analysis` never raises, and callers/tests can
 monkeypatch `_invoke_with_fallback` to drive the agent's raw output without a
 real LLM call.
 """
@@ -28,7 +27,7 @@ from typing import Any, get_args
 
 from deepagents import create_deep_agent
 
-from app.cartographer.analyze import summarize_graph
+from app.cartographer.graph_summary import summarize_graph
 from app.config import settings
 from app.graph import _extract_last_content, _invoke_with_fallback, _strip_markdown_fences
 from app.llm import chat_model
@@ -46,7 +45,7 @@ from app.models.domain import (
 
 logger = logging.getLogger(__name__)
 
-# ── Model selection (same pattern as app.graph / app.cartographer.analyze) ─────
+# ── Model selection (same pattern as app.graph) ─────
 MODEL = settings.model
 MODEL_FALLBACKS = settings.model_fallbacks
 

@@ -6,8 +6,7 @@ import "./AppShell.css";
 
 const NAV_ITEMS = [
   { to: "/", label: "Ideas" },
-  { to: "/cartographer", label: "Cartographer" },
-  { to: "/advisor", label: "Advisor" },
+  { to: "/advisor", label: "Repository Intelligence" },
   { to: "/history", label: "History" },
 ];
 
@@ -64,7 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="app-shell__main">{children}</main>
 
       <footer className="app-shell__footer">
-        <span className="mono-label">Dev-Strom &mdash; Idea Generator &amp; Project Cartographer</span>
+        <span className="mono-label">Dev-Strom &mdash; Idea Generator &amp; Repository Intelligence</span>
       </footer>
     </div>
   );

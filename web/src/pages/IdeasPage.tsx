@@ -128,7 +128,7 @@ export function IdeasPage() {
             type="button"
             className="btn btn-secondary"
             onClick={handleGenerateMore}
-            disabled={state.status === "loading" || !intent.trim()}
+            disabled={!intent.trim()}
           >
             Generate more
           </button>

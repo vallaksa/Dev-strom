@@ -26,8 +26,6 @@ export function HistoryPage() {
   const analyses = useAsyncData(() => getAnalyses(20, 0), []);
   const navigate = useNavigate();
 
-  // Analyses are an optional backend feature — if the endpoint isn't available
-  // yet, silently omit the section rather than surfacing an error.
   const analysisRows = analyses.status === "success" ? analyses.data.analyses : [];
 
   return (
@@ -40,7 +38,7 @@ export function HistoryPage() {
 
       {analysisRows.length > 0 && (
         <section className="history-section">
-          <h2 className="history-section__title">Repository Analyses</h2>
+          <h2 className="history-section__title">Repo Intelligence</h2>
           <div className="card history-table-wrap">
             <table className="history-table">
               <thead>
@@ -82,7 +80,7 @@ export function HistoryPage() {
         {ideas.status === "loading" && <LoadingState label="Loading history" />}
         {ideas.status === "error" && <ErrorState message={ideas.error} onRetry={ideas.reload} />}
         {ideas.status === "success" && ideas.data.runs.length === 0 && (
-          <EmptyState message="No runs yet. Generate some ideas or analyze a repo to see them here." />
+          <EmptyState message="No runs yet. Generate ideas or analyze a repo to see them here." />
         )}
 
         {ideas.status === "success" && ideas.data.runs.length > 0 && (

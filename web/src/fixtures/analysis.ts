@@ -16,9 +16,8 @@ export const sampleAnalysis: Analysis = {
     "Dev-Strom is a single-service FastAPI backend that pairs an LLM idea generator " +
     "(LangGraph) with a repository-analysis engine. Deterministic ingestion parses a repo " +
     "into structured metadata and a dependency model; LLM reasoning then produces evidence-" +
-    "backed findings and ranked recommendations on top of that model. Persistence is a single " +
-    "PostgreSQL instance (JSONB), with Neo4j available as an opt-in graph store. Analysis " +
-    "currently runs inline on the request thread — the largest structural constraint.",
+    "backed findings and ranked recommendations on top of that model. Persistence is PostgreSQL " +
+    "(JSONB). Analysis currently runs inline on the request thread — the largest structural constraint.",
   repository: {
     id: "repo-demo-0001",
     url: "https://github.com/example-org/dev-strom",
@@ -31,7 +30,6 @@ export const sampleAnalysis: Analysis = {
       { name: "langgraph", ecosystem: "pypi", source: "pyproject.toml", version: "0.2.28" },
       { name: "sqlalchemy", ecosystem: "pypi", source: "pyproject.toml", version: "2.0.35" },
       { name: "pydantic", ecosystem: "pypi", source: "pyproject.toml", version: "2.9.2" },
-      { name: "neo4j", ecosystem: "pypi", source: "pyproject.toml", version: "5.24.0" },
       { name: "react", ecosystem: "npm", source: "web/package.json", version: "19.2.8" },
       { name: "@xyflow/react", ecosystem: "npm", source: "web/package.json", version: "12.11.3" },
       { name: "vite", ecosystem: "npm", source: "web/package.json", version: "6.4.3" },
@@ -56,12 +54,12 @@ export const sampleAnalysis: Analysis = {
       evidence: [
         {
           file: "app/cartographer/pipeline.py",
-          line_start: 34,
-          line_end: 58,
-          symbol: "cartograph",
-          snippet: "graph = parse_repository(root)\nreport = analyze_architecture(graph)",
+          line_start: 74,
+          line_end: 99,
+          symbol: "_ingest_and_analyze",
+          snippet: "full_graph = build_project_graph(root_path, ...)\nanalysis = analyze_findings(graph, repository)",
           explanation:
-            "parse_repository() is pure code; only analyze_architecture() calls the LLM, and it consumes the " +
+            "Ingestion is pure code; only analyze_findings() calls the LLM, and it consumes the " +
             "already-built graph — a clean deterministic/reasoning split.",
         },
       ],
@@ -72,7 +70,7 @@ export const sampleAnalysis: Analysis = {
       category: "scalability",
       title: "Analysis runs synchronously on the request thread",
       description:
-        "POST /cartograph and /analyze perform clone → parse → LLM inline and return on the same request. " +
+        "POST /analyze performs clone → parse → LLM inline and returns on the same request. " +
         "Large repositories will block a worker for the full LLM round-trip and risk request timeouts.",
       confidence: 0.86,
       severity: "high",
@@ -81,8 +79,8 @@ export const sampleAnalysis: Analysis = {
           file: "app/api.py",
           line_start: 112,
           line_end: 126,
-          symbol: "post_cartograph",
-          snippet: "result = cartograph(req.repo_url or req.path)\nreturn CartographResponse(...)",
+          symbol: "post_analyze",
+          snippet: "analysis, graph = analyze_repository_with_graph(target, ...)\nreturn _analysis_response(...)",
           explanation:
             "The handler awaits the full pipeline before responding; there is no job/worker hand-off on the " +
             "default (non-async) path.",
@@ -132,12 +130,12 @@ export const sampleAnalysis: Analysis = {
           explanation: "A raw provider call with local try/except.",
         },
         {
-          file: "app/cartographer/analyze.py",
-          line_start: 60,
-          line_end: 71,
-          symbol: "analyze_architecture",
-          snippet: "resp = client.chat.completions.create(...)",
-          explanation: "A second, near-identical raw call — no shared wrapper.",
+          file: "app/cartographer/findings.py",
+          line_start: 360,
+          line_end: 380,
+          symbol: "analyze_findings",
+          snippet: "resp = _invoke_with_fallback(agent, ...)",
+          explanation: "A second LLM path alongside the idea pipeline — no shared wrapper yet.",
         },
       ],
     },
@@ -159,8 +157,8 @@ export const sampleAnalysis: Analysis = {
           symbol: null,
           snippet: null,
           explanation:
-            "Only happy-path parsing is asserted; there is no contract test that analyze_architecture output " +
-            "always validates against the ArchitectureReport schema.",
+            "Only happy-path parsing is asserted; there is no contract test that analyze_findings output " +
+            "always validates against the Analysis schema.",
         },
       ],
     },
@@ -241,11 +239,10 @@ export const sampleAnalysis: Analysis = {
   Ideas -->|LLM| OpenAI[(OpenAI)]
   Reason -->|LLM| OpenAI
   API --> Store[Services Layer]
-  Store --> PG[(PostgreSQL)]
-  Store -.opt-in.-> Neo[(Neo4j)]`,
+  Store --> PG[(PostgreSQL)]`,
 };
 
-/** Demo-mode listing for the History page's Repository Analyses section. */
+/** Demo-mode listing for the History page's Repo Intelligence section. */
 export const sampleAnalysisHistory: AnalysisHistoryResponse = {
   analyses: [
     {

@@ -1,9 +1,7 @@
 """Integration tests for the /analyze endpoints (app/api.py) via TestClient.
 
-`app.cartographer.pipeline.analyze_repository_with_graph` and the analysis
-store's save/get are monkeypatched directly on app.api's module namespace —
-same pattern test_cartographer_api.py uses — so these tests never make a real
-clone / LLM / DB call.
+`analyze_repository_with_graph` and the analysis store's save/get are
+monkeypatched on app.api's module namespace — no real clone / LLM / DB call.
 """
 
 import importlib.util
@@ -32,7 +30,7 @@ def _fake_analysis() -> dict:
              "title": "Synchronous analysis blocks the request", "description": "…",
              "confidence": 0.75, "severity": "high",
              "evidence": [{"file": "app/api.py", "line_start": None, "line_end": None,
-                           "symbol": "post_cartograph", "snippet": None,
+                           "symbol": "post_analyze", "snippet": None,
                            "explanation": "clone+parse+LLM run before the response"}]},
         ],
         "recommendations": [

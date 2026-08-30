@@ -1,14 +1,14 @@
 # Dev-Strom — Web (F3)
 
-React frontend for Dev-Strom: idea generation, Project Cartographer (interactive
-architecture graph), Advisor, and run history.
+React frontend for Dev-Strom: idea generation, Repository Intelligence
+(evidence-first repo analysis), and run history.
 
 ## Stack
 
 - [Vite](https://vite.dev) + React + TypeScript
 - [React Router](https://reactrouter.com) for client-side routing
-- [`@xyflow/react`](https://reactflow.dev) (React Flow) + [`dagre`](https://github.com/dagrejs/dagre) for the Cartographer graph and its auto-layout
-- [`mermaid`](https://mermaid.js.org) to render the ArchitectureReport's mermaid diagram
+- [`@xyflow/react`](https://reactflow.dev) (React Flow) + [`dagre`](https://github.com/dagrejs/dagre) for the architecture graph and its auto-layout
+- [`mermaid`](https://mermaid.js.org) to render optional architecture diagrams
 
 ## Develop
 
@@ -40,7 +40,7 @@ npm run preview   # serve the production build locally
 
 The backend may not be running wherever this is reviewed (missing
 `API_KEY`/`TAVILY_API_KEY`, no Postgres, etc). **Demo mode** makes
-every page — especially the Cartographer graph — fully render and be
+every page — especially the Repository Intelligence graph — fully render and be
 interactable using local fixtures instead of live API calls.
 
 - **Runtime toggle**: the "Demo Mode" switch in the top nav bar. Persisted to
@@ -57,10 +57,8 @@ Fixtures live in `src/fixtures/`:
   backend (repo → packages → modules → classes/functions, external deps, a
   Postgres service node, and an entrypoint), with `contains` / `imports` /
   `calls` / `depends_on` / `reads_writes` / `exposes` edges.
-  `architectureReport.ts` — a matching ArchitectureReport (including a
-  mermaid diagram) for that graph.
-- `advisorReport.ts` — a sample AdvisorReport with quick wins, strategic
-  bets, and categorized recommendations.
+- `analysis.ts` — a sample evidence-first `Analysis` with findings,
+  recommendations, and the structural graph for the Repository Intelligence view.
 - `ideas.ts` — sample ideas and history rows.
 
 Each `src/api/*.ts` module checks `isDemoMode()` (`src/lib/demoMode.ts`) and
@@ -74,7 +72,7 @@ states regardless of demo mode.
 ```
 src/
   api/          typed fetch client + one module per backend resource
-                (ideas, cartograph, advise, history, health) + domain types
+                (ideas, analyze, history, health) + domain types
   components/   shared UI (AppShell, cards, badges, state blocks) and the
                 graph/ subfolder (React Flow node/edge rendering, legend,
                 detail panel, mermaid renderer)
@@ -82,8 +80,8 @@ src/
   hooks/        useAsyncAction (on-demand calls), useAsyncData (load-on-
                 mount), useDemoMode
   lib/          demoMode flag, dagre graph layout, mermaid render helper
-  pages/        one file per route (Ideas, Cartographer, Advisor, History,
-                RunDetail)
+  pages/        one file per route (Ideas, Repository Intelligence, History,
+                AnalysisDetail, RunDetail)
   theme/        design tokens (tokens.css) + base styles/motifs (base.css)
 ```
 
@@ -101,17 +99,14 @@ JetBrains Mono) are loaded via a Google Fonts `@import` in `tokens.css`.
 ## Backend endpoints covered
 
 `POST /ideas`, `POST /expand`, `POST /export`, `GET /history`,
-`GET /runs/{run_id}`, `POST /cartograph`, `GET /cartograph/{run_id}`,
-`POST /advise`, `GET /advise/{run_id}`, `GET /health`, `GET /ready`. See
-`src/api/types.ts` for the full typed contract.
+`GET /runs/{run_id}`, `POST /analyze`, `GET /analyze/{run_id}`,
+`GET /analyses`, `GET /health`, `GET /ready`. See `src/api/types.ts` for the
+full typed contract.
 
 ## Known TODOs
 
-- `/advise` and `GET /advise/{run_id}` are not yet implemented on the
-  backend (only `/cartograph` exists there today) — the Advisor page's
-  types/client are ready for it; until then, exercise it via demo mode.
 - No auth yet; the API client has no place to attach credentials because the
   backend doesn't require any yet.
-- The Cartographer graph re-runs dagre layout on every filter toggle; fine
+- The architecture graph re-runs dagre layout on every filter toggle; fine
   at fixture scale (~25 nodes) but worth memoizing/virtualizing for very
   large real repos.

@@ -35,7 +35,7 @@ Edit `.env` and set:
 
 `GET /health` (liveness) and `GET /ready` (readiness — pings the database when `DATABASE_URL` is configured) are available once the API is running.
 
-> **Note:** Start the **API** and **web** dev server in separate terminals. See [web/README.md](web/README.md) for frontend details (demo mode, build, Cartographer graph).
+> **Note:** Start the **API** and **web** dev server in separate terminals. See [web/README.md](web/README.md) for frontend details (demo mode, build, Repository Intelligence).
 
 **Example (API):**
 
@@ -152,7 +152,7 @@ points; `migrations/` holds Alembic migrations.
 | `app/services/models.py` | SQLAlchemy ORM models: `User`, `Run`, `ExpandedIdea` (and `web_chunks`, scaffolded — see [RAG status](#rag-status-web_chunks) below). |
 | `app/services/run_service.py` | Run/expansion persistence: `save_run`, `save_expanded_idea`, `get_latest_expansion`, `load_history`, `get_run`. |
 | `app/services/export_formatter.py` | Idea + extended plan → LLM-ready Markdown for download. |
-| `web/` | React + Vite frontend: Ideas, Cartographer, Advisor, History. See [web/README.md](web/README.md). |
+| `web/` | React + Vite frontend: Ideas, Repository Intelligence, History. See [web/README.md](web/README.md). |
 | `scripts/run_graph.py` | CLI entry point with `--stream` and `--debug` flags. |
 | `scripts/test_web_search.py` | Smoke-tests the Tavily search tool in isolation. |
 | `migrations/` | Alembic migration environment and versions (`001_initial_schema.py`, ...). |
@@ -237,40 +237,8 @@ docker compose up --build
 ```
 
 This starts `db` (Postgres with pgvector), a one-shot `migrate` service that runs `alembic upgrade head`
-before anything else starts, and `api` (FastAPI on `:8000`). Run the React dev server separately from `web/` (`npm run dev`, port 5173). Neo4j is not part of this compose file;
-on the server it runs as a standalone Docker daemon on `global-network` next to Postgres (see
-[Project Cartographer / Neo4j](#project-cartographer--neo4j)). Validate the compose file without a running
-daemon via `docker compose config`.
-
-## Project Cartographer / Neo4j
-
-Cartographer stores runs in Postgres JSONB by default (`CARTOGRAPH_STORE_BACKEND=postgres`). Neo4j is an
-optional graph store, hosted the same way as Postgres on this server: a standalone Docker container on
-`global-network` with `restart: unless-stopped`.
-
-```bash
-docker run -d \
-  --name neo4j \
-  --restart unless-stopped \
-  --network global-network \
-  -p 7474:7474 \
-  -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/devstrom \
-  -v neo4j_data:/data \
-  neo4j:5
-```
-
-Then in `.env` (must match `NEO4J_AUTH`, default `neo4j/devstrom`):
-
-```
-NEO4J_URI=neo4j://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=devstrom
-CARTOGRAPH_STORE_BACKEND=neo4j
-```
-
-From another container on `global-network`, use `NEO4J_URI=neo4j://neo4j:7687`. Restart the API after
-changing these variables. Leave `CARTOGRAPH_STORE_BACKEND=postgres` (or unset) if you are not using Neo4j.
+before anything else starts, and `api` (FastAPI on `:8000`). Run the React dev server separately from `web/` (`npm run dev`, port 5173).
+Validate the compose file without a running daemon via `docker compose config`.
 
 ## PostgreSQL MCP (V3-6 / V3-7)
 

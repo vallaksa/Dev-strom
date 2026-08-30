@@ -1,13 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { getAnalyses } from "../api/analyze";
-import { postAdvise } from "../api/advise";
-import { AdvisorReportView } from "../components/AdvisorReportView";
+import { Link } from "react-router-dom";
+import { getAnalyses, getAnalysis, postAnalyze } from "../api/analyze";
+import { RepoIntelligence } from "../components/repo/RepoIntelligence";
 import { SectionMarker } from "../components/SectionMarker";
 import { EmptyState, ErrorState, LoadingState } from "../components/StateBlocks";
-import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useAsyncData } from "../hooks/useAsyncData";
-import type { AdviseRequest } from "../api/types";
-import "./AdvisorPage.css";
+import type { Analysis } from "../api/types";
+import "./RepoIntelligencePage.css";
 
 type InputMode = "repo_url" | "path" | "run_id";
 
@@ -27,47 +26,56 @@ function formatDate(iso: string): string {
 
 export function AdvisorPage() {
   const [mode, setMode] = useState<InputMode>("repo_url");
-  const [url, setUrl] = useState("https://github.com/example-org/dev-strom");
+  const [url, setUrl] = useState("");
   const [path, setPath] = useState("");
   const [runId, setRunId] = useState("");
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const pastAnalyses = useAsyncData(() => getAnalyses(50, 0), []);
-  const [state, run] = useAsyncAction(postAdvise);
-
   const analysisRows = pastAnalyses.status === "success" ? pastAnalyses.data.analyses : [];
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const body: AdviseRequest | null =
-      mode === "repo_url"
-        ? url.trim()
-          ? { repo_url: url.trim() }
-          : null
-        : mode === "path"
-          ? path.trim()
-            ? { path: path.trim() }
-            : null
-          : runId.trim()
-            ? { run_id: runId.trim() }
-            : null;
-    if (!body) return;
-    run(body);
+    setError(null);
+    setAnalysis(null);
+    setLoading(true);
+    try {
+      if (mode === "run_id") {
+        if (!runId.trim()) return;
+        setAnalysis(await getAnalysis(runId.trim()));
+      } else if (mode === "path") {
+        if (!path.trim()) return;
+        setAnalysis(await postAnalyze({ path: path.trim() }));
+      } else {
+        if (!url.trim()) return;
+        setAnalysis(await postAnalyze({ repo_url: url.trim() }));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Analysis failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const submitDisabled =
-    state.status === "loading" || (mode === "run_id" && !runId);
+    loading ||
+    (mode === "run_id" && !runId) ||
+    (mode === "repo_url" && !url.trim()) ||
+    (mode === "path" && !path.trim());
 
   return (
-    <div className="advisor-page">
-      <SectionMarker index="III" label="Advisor" />
-      <h1>Get an architectural second opinion.</h1>
-      <p className="advisor-page__lede">
-        Point Dev-Strom at a repo (or reuse a prior analysis) and it will recommend
-        concrete next moves, ranked by impact and effort.
+    <div className="repo-intel-page">
+      <SectionMarker index="II" label="Repository Intelligence" />
+      <h1>Analyze a repository.</h1>
+      <p className="repo-intel-page__lede">
+        Paste a GitHub URL or local path. Dev-Strom maps services and architecture
+        patterns at the distributed-systems level — not every class and function.
       </p>
 
-      <form className="card advisor-form" onSubmit={handleSubmit}>
-        <div className="advisor-form__mode">
+      <form className="card repo-intel-form" onSubmit={handleSubmit}>
+        <div className="repo-intel-form__mode">
           {(Object.keys(MODE_LABEL) as InputMode[]).map((m) => (
             <button
               key={m}
@@ -79,8 +87,9 @@ export function AdvisorPage() {
             </button>
           ))}
         </div>
-        <div className="field advisor-form__input">
-          <label htmlFor="advise-target">{MODE_LABEL[mode]}</label>
+
+        <div className="field repo-intel-form__field">
+          <label htmlFor="analyze-target">{MODE_LABEL[mode]}</label>
           {mode === "run_id" ? (
             pastAnalyses.status === "loading" ? (
               <LoadingState label="Loading past analyses" />
@@ -90,7 +99,7 @@ export function AdvisorPage() {
               <EmptyState message="No past analyses yet — analyze a repository first." />
             ) : (
               <select
-                id="advise-target"
+                id="analyze-target"
                 className="input"
                 value={runId}
                 onChange={(e) => setRunId(e.target.value)}
@@ -106,27 +115,42 @@ export function AdvisorPage() {
             )
           ) : (
             <input
-              id="advise-target"
-              className="input"
+              id="analyze-target"
+              className="input repo-intel-form__input"
               value={mode === "repo_url" ? url : path}
               onChange={(e) => (mode === "repo_url" ? setUrl(e.target.value) : setPath(e.target.value))}
-              placeholder={mode === "path" ? "/path/to/repo" : "https://github.com/org/repo"}
+              placeholder={mode === "path" ? "/path/to/repo" : "https://github.com/user/repository"}
+              autoComplete="off"
+              spellCheck={false}
               required
             />
           )}
         </div>
-        <button type="submit" className="btn btn-primary" disabled={submitDisabled}>
-          {state.status === "loading" ? "Advising…" : "Get Recommendations"}
-        </button>
+
+        <div className="repo-intel-form__actions">
+          <button type="submit" className="btn btn-primary" disabled={submitDisabled}>
+            {loading ? "Analyzing…" : "Analyze Repository"}
+          </button>
+        </div>
       </form>
 
-      {state.status === "loading" && <LoadingState label="Analyzing and drafting recommendations" />}
-      {state.status === "error" && <ErrorState message={state.error} />}
-      {state.status === "success" && (
-        <>
-          <div className="advisor-page__run-meta mono-label">{state.data.run_id}</div>
-          <AdvisorReportView report={state.data.advisor_report} />
-        </>
+      {loading && <LoadingState label="Cloning, parsing, and reasoning about the codebase" />}
+      {error && <ErrorState message={error} />}
+
+      {analysis?.status === "failed" && (
+        <ErrorState message={analysis.summary || "Analysis failed."} />
+      )}
+
+      {analysis?.status === "complete" && (
+        <div className="repo-intel-page__results">
+          <hr className="hr" />
+          <div className="repo-intel-page__permalink">
+            <Link to={`/analysis/${analysis.run_id}`} className="mono-label">
+              Permalink to this analysis &rarr;
+            </Link>
+          </div>
+          <RepoIntelligence analysis={analysis} />
+        </div>
       )}
     </div>
   );

@@ -12,12 +12,6 @@ Plan §12), not around individual LangGraph nodes or the HTTP boundary:
 The idea-generation experience keeps its own domain objects (`ProjectIdea`
 / `Idea`) so the platform can grow the "Understand / Improve" side without
 forcing everything through a generic "run".
-
-NOTE ON NAMING: `app.advisor.model.Recommendation` is a *separate*,
-LLM-report-shaped contract used by the F2 Advisor pipeline. The
-`Recommendation` here is the platform-level domain object described in the
-plan (id / finding_id / type / impact / effort / priority) and is
-deliberately distinct — do not conflate the two.
 """
 
 from __future__ import annotations

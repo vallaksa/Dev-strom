@@ -45,17 +45,6 @@ class Settings(BaseSettings):
     # ── database ───────────────────────────────────────────────────────────
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
-    # ── graph database (F1-4, Neo4jStore) ─────────────────────────────────
-    neo4j_uri: str | None = Field(default=None, alias="NEO4J_URI")
-    neo4j_user: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("NEO4J_USER", "NEO4J_USERNAME"),
-    )
-    neo4j_password: str | None = Field(default=None, alias="NEO4J_PASSWORD")
-
-    # Which CartographStore backend to use: "postgres" (default) or "neo4j".
-    cartograph_store_backend: str = Field(default="postgres", alias="CARTOGRAPH_STORE_BACKEND")
-
     # ── LLM model selection ────────────────────────────────────────────────
     # Defaults come from config/llm.json. Override with DEVSTROM_MODEL to
     # switch without editing the file. Remaining listed models are fallbacks.
