@@ -29,6 +29,7 @@ def load_llm_config(path: Path | None = None) -> dict:
         "base_url": data.get("base_url") or DEFAULT_BASE_URL,
         "active": active,
         "models": models,
+        "search_model": data.get("search_model") or "perplexity/sonar",
     }
 
 
@@ -40,6 +41,11 @@ def model_chain(cfg: dict | None = None, *, active: str | None = None) -> tuple[
         models = [chosen, *models]
     fallbacks = [m for m in models if m != chosen]
     return chosen, fallbacks
+
+
+def search_model_name(cfg: dict | None = None) -> str:
+    cfg = cfg or load_llm_config()
+    return cfg.get("search_model") or "perplexity/sonar"
 
 
 @lru_cache(maxsize=None)

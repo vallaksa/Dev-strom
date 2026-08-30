@@ -13,7 +13,7 @@ from functools import lru_cache
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.llm import load_llm_config, model_chain
+from app.llm import load_llm_config, model_chain, search_model_name
 
 _LLM_PRIMARY, _LLM_FALLBACKS = model_chain(load_llm_config())
 
@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     )
     tavily_api_key: str | None = Field(default=None, alias="TAVILY_API_KEY")
 
+    @property
+    def openai_api_key(self) -> str | None:
+        """Backward-compatible alias for api_key."""
+        return self.api_key
+
     # ── database ───────────────────────────────────────────────────────────
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
@@ -58,6 +63,10 @@ class Settings(BaseSettings):
     model_fallbacks: list[str] = Field(
         default_factory=lambda: list(_LLM_FALLBACKS),
         alias="DEVSTROM_MODEL_FALLBACKS",
+    )
+    search_model: str = Field(
+        default_factory=lambda: search_model_name(load_llm_config()),
+        alias="DEVSTROM_SEARCH_MODEL",
     )
 
     # ── service URLs ───────────────────────────────────────────────────────
