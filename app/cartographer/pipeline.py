@@ -58,7 +58,11 @@ def cartograph(url_or_path: str, repo_url: str | None = None, depth: int = 1) ->
     root_path = resolve_source(url_or_path, depth=depth)
 
     try:
-        graph = build_project_graph(root_path, repo_url=repo_url or (None if was_local_dir else url_or_path))
+        graph = build_project_graph(
+            root_path,
+            repo_url=repo_url or (None if was_local_dir else url_or_path),
+            include_members=False,
+        )
         graph = to_system_graph(graph)
     finally:
         if not was_local_dir:
@@ -80,13 +84,13 @@ def _ingest_and_analyze(
 
     try:
         commit_sha = _git_commit_sha(root_path)
-        graph = build_project_graph(root_path, repo_url=provenance)
-        graph = to_system_graph(graph)
+        full_graph = build_project_graph(root_path, repo_url=provenance, include_members=False)
+        repository = repository_from_graph(full_graph, commit_sha=commit_sha)
+        graph = to_system_graph(full_graph)
     finally:
         if not was_local_dir:
             cleanup_clone(root_path)
 
-    repository = repository_from_graph(graph, commit_sha=commit_sha)
     analysis = analyze_findings(graph, repository)
     logger.info(
         "analyze_repository: %s -> %d findings, %d recommendations (status=%s)",

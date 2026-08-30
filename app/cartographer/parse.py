@@ -289,7 +289,7 @@ def _parse_python_file(
     module_id: str,
     rel_path: Path,
     *,
-    include_members: bool = False,
+    include_members: bool = True,
 ) -> None:
     try:
         source = abs_path.read_text(encoding="utf-8", errors="ignore")
@@ -553,12 +553,12 @@ def build_project_graph(
     root_path: str,
     repo_url: str | None = None,
     *,
-    include_members: bool = False,
+    include_members: bool = True,
 ) -> ProjectGraph:
     """Walk `root_path` and build a normalized ProjectGraph.
 
-    By default skips class/function nodes (`include_members=False`) — the
-    pipeline rolls the graph up to system level via `aggregate.to_system_graph`.
+    Class/function nodes are included by default. Pass `include_members=False`
+    when the graph will be rolled up to system level via `aggregate.to_system_graph`.
     """
     root = Path(root_path).resolve()
     if not root.is_dir():

@@ -95,6 +95,14 @@ def _classify_external(name: str) -> str:
     return "library"
 
 
+def _is_product_path(path: str | None) -> bool:
+    """True when `path` sits under a directory (not a root-level file like README.md)."""
+    if not path or path in (".", ""):
+        return False
+    normalized = path.replace("\\", "/").strip("/")
+    return "/" in normalized
+
+
 def to_system_graph(full: ProjectGraph) -> ProjectGraph:
     """Return a small system-level graph derived from `full`."""
     nodes_by_id = {n.id: n for n in full.nodes}
@@ -106,10 +114,12 @@ def to_system_graph(full: ProjectGraph) -> ProjectGraph:
     for n in full.nodes:
         if n.type in ("class", "function"):
             continue
+        if n.type == "file" and not _is_product_path(n.path):
+            continue
         seg = _top_segment(n.path)
-        if seg and seg not in _SKIP_TOP_LEVEL:
+        if seg and seg not in _SKIP_TOP_LEVEL and _is_product_path(n.path):
             path_to_service[n.path or ""] = seg
-        elif n.type == "package" and n.path:
+        elif n.type == "package" and n.path and _is_product_path(n.path):
             seg = _top_segment(n.path)
             if seg and seg not in _SKIP_TOP_LEVEL:
                 path_to_service[n.path] = seg
@@ -162,6 +172,8 @@ def to_system_graph(full: ProjectGraph) -> ProjectGraph:
         ep_node = nodes_by_id.get(ep)
         ep_path = ep_node.path if ep_node else ep.replace("module:", "").replace("file:", "")
         seg = _top_segment(ep_path) or service_segments[0]
+        if seg in _SKIP_TOP_LEVEL or seg not in service_segments:
+            seg = service_segments[0]
         ep_id = f"entrypoint:{ep}"
         label = ep_path.split("/")[-1] if ep_path else "entry"
         entrypoint_nodes.append(
@@ -268,7 +280,11 @@ def _infer_patterns(
         patterns.append("External SaaS / LLM integration")
 
     manifests = full.manifests or {}
-    if any("docker" in str(m).lower() for m in manifests.keys()):
+    has_dockerfile = any(
+        n.type == "file" and "dockerfile" in (n.label or n.path or "").lower()
+        for n in full.nodes
+    )
+    if has_dockerfile:
         patterns.append("Container-oriented deployment")
 
     if re.search(r"fastapi|uvicorn|flask|django", str(manifests).lower()):
