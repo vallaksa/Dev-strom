@@ -1,11 +1,10 @@
 """Add jobs table (F4-surface: in-process background job runner).
 
-Stores one row per background job (e.g. an async /cartograph or /advise
-run) so a client can poll GET /jobs/{job_id} for status/result instead of
-blocking the original HTTP request on the full pipeline. See
-app/services/jobs.py for the create_job/get_job/run_job primitives that
-read and write this table, and app/services/models.py's `Job` ORM class for
-the column contract.
+Stores one row per background job (e.g. an async POST /analyze run) so a
+client can poll GET /jobs/{job_id} for status/result instead of blocking
+the original HTTP request on the full pipeline. See app/services/jobs.py
+for the create_job/get_job/run_job primitives that read and write this table,
+and app/services/models.py's `Job` ORM class for the column contract.
 
 Revision: 005
 """

@@ -1,8 +1,8 @@
 """Dev-Strom FastAPI server.
 
-Exposes endpoints for idea generation, expansion, export, and history.
-All runs are persisted to PostgreSQL. Until auth is implemented, all
-operations use the ANONYMOUS_USER_ID.
+Exposes endpoints for idea generation, expansion, export, history, and
+repository intelligence (POST /analyze). All runs are persisted to PostgreSQL.
+Until auth is implemented, all operations use the ANONYMOUS_USER_ID.
 """
 
 import logging
@@ -34,9 +34,8 @@ from app.services.run_service import (
 )
 
 # ── Repository Intelligence / Analysis (Evidence-First) ──────────────────────
-# Same guarding rationale as the Cartographer/Advisor imports above: keep
-# app.api importable (and the /analyze routes 503-able) even if the analyzer
-# pipeline/store fails to import, and let tests monkeypatch these names.
+# Guard imports so app.api stays loadable if the analyzer pipeline fails;
+# tests monkeypatch these names directly.
 try:
     from app.cartographer.analysis_store import PostgresJsonbStore as AnalysisPostgresJsonbStore
     from app.cartographer.pipeline import analyze_repository_with_graph
@@ -53,9 +52,7 @@ except ImportError as exc:
     list_analysis_runs = None
 
 # ── Async Job Runner (F4) ────────────────────────────────────────────────────
-# Same guarding rationale as the Cartographer/Advisor imports above: keep
-# app.api importable (and its async routes 503-able) even if
-# app.services.jobs isn't available yet.
+# Guard imports so app.api stays loadable if app.services.jobs is unavailable.
 try:
     from app.services.jobs import create_job, get_job, run_job
 except ImportError as exc:

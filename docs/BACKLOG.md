@@ -35,7 +35,7 @@ Features and improvements beyond the current V3 scope. Items are grouped by them
 
 ## Reliability & Scale
 
-- **Async / background jobs** — For long-running generations, return a job ID immediately and let the client poll for completion instead of blocking. Decouples request lifecycle from graph execution time.
+- **Async / background jobs** — Shipped for `POST /analyze` (`?async=true` + `GET /jobs/{job_id}`). A full queue/worker stack for idea generation remains backlog.
 - **Queue and workers** — Decouple the FastAPI server from LangGraph execution with a task queue (Celery + Redis or similar). Required for horizontal scaling and multi-worker deployments.
 
 ---
@@ -56,7 +56,7 @@ Full authentication stack deferred to focus on core features first. All features
 
 ## React Frontend
 
-React frontend shipped as F3 (`web/`): Ideas, History, Cartographer, Advisor. Auth and Settings pages remain in backlog.
+React frontend shipped as F3 (`web/`): Ideas, Repository Intelligence, History. Auth and Settings pages remain in backlog.
 
 - **V3-17: React + Vite scaffold + routing + API client** — Done (F3).
 - **V3-18: React auth (login page + JWT flow)** — Google OAuth login page consuming the backend auth routes.

@@ -2,7 +2,7 @@
 
 > This is the single source of truth for the Dev-Strom roadmap.
 > All versions, decisions, and scope changes are tracked here.
-> See `V1_TICKETS.md`, `V2_TICKETS.md`, `V3_TICKETS.md`, and `BACKLOG.md` for granular tickets.
+> See `V3_TICKETS.md` and `BACKLOG.md` for granular tickets.
 
 ---
 
@@ -28,17 +28,16 @@ Ideas are grounded in **live web search results** so they are practical and curr
 | V1      | ✅ Complete  | Core idea generator (MVP)                  |
 | V2      | ✅ Complete  | Feature expansion + UX polish              |
 | V3      | ✅ Complete  | Postgres, history, MCP (auth/RAG descoped) |
-| F1–F4   | ✅ Complete  | Cartographer, Advisor, React UI, async jobs |
-| Neo4j live store | ✅ Wired, opt-in | CartographStore factory + Docker daemon |
-| V4      | 📋 Next     | Neo4j GraphRAG (not the Cartographer store) |
+| F1–F4   | ✅ Complete  | Repository Intelligence, React UI, async jobs (legacy Cartographer/Advisor removed 2026-08) |
+| V4      | 📋 Next     | Neo4j GraphRAG |
 
 ---
 
 ---
 
-## Where we are (2026-08-19)
+## Where we are (2026-08-30)
 
-V1–V3 (reduced V3 scope) and F1–F4 are in `main`. Cartographer still **defaults to Postgres JSONB**. Neo4j is installed on the server as a Docker daemon and is an **opt-in** CartographStore backend. Making Neo4j the default is a later decision, not part of wiring.
+V1–V3 and F1–F4 are in `main`. **Repository Intelligence** is the single repo-analysis product surface: `POST /analyze` persists to `analysis_runs` (Postgres JSONB). The old `/cartograph` and `/advise` endpoints, CartographStore, Neo4j cartograph backend, and separate Cartographer/Advisor UI tabs were removed in favor of one `RepoIntelligence` view.
 
 ### What actually runs on the server
 
@@ -48,16 +47,14 @@ Browser  →  React (web/, :5173)
                 ▼
          FastAPI (app.api, :8000)
                 │
-     ┌──────────┼──────────────┐
-     ▼          ▼              ▼
- Postgres    Neo4j          postgres-mcp
- (Docker,    (Docker,       (Docker, :3000)
-  :5432,      :7474/:7687,
-  global-     global-
-  network)    network)
+     ┌──────────┴──────────────┐
+     ▼                         ▼
+ Postgres                  postgres-mcp
+ (Docker, :5432,            (Docker, :3000)
+  global-network)
 ```
 
-Both databases are standalone Docker daemons on `global-network` with `restart: unless-stopped`. They are **not** started by Dev-Strom `docker-compose.yml`. Compose `db` is the portable/dev template; this server uses the existing `postgres` container. Neo4j is the container named `neo4j` (image `neo4j:5`).
+Dev-Strom `docker-compose.yml` starts Postgres for local/dev. On the server, Postgres runs as a standalone Docker daemon on `global-network`. Neo4j may still run on the server for future GraphRAG work but is **not** used by the application today.
 
 ### API surface (shipped)
 
@@ -66,36 +63,25 @@ Both databases are standalone Docker daemons on `global-network` with `restart: 
 | POST | `/ideas` | Idea generation |
 | POST | `/expand` | Expand one idea by pid |
 | POST | `/export` | Markdown export |
-| GET | `/history`, `/runs/{run_id}` | Persisted runs |
-| POST | `/cartograph` | Architecture graph; optional `?async=true` |
-| GET | `/cartograph/{run_id}` | Load a cartograph run |
-| POST | `/analyze` | Evidence-first Repository Intelligence: deterministic ingest → `Analysis` (Repository + evidence-backed Findings + Recommendations) + component `mermaid` + structural `graph`; optional `?async=true` |
-| GET | `/analyze/{run_id}` | Load an analysis run (same flat body as POST) |
-| GET | `/analyses` | List recent analysis runs as summary rows (History), paged like `/history` |
-| POST | `/advise` | Improvement advisor; optional `?async=true` |
-| GET | `/advise/{run_id}` | Load an advisor run |
+| GET | `/history`, `/runs/{run_id}` | Persisted idea runs |
+| POST | `/analyze` | Evidence-first Repository Intelligence; optional `?async=true` |
+| GET | `/analyze/{run_id}` | Load an analysis run |
+| GET | `/analyses` | List recent analysis runs (History), paged |
 | GET | `/jobs/{job_id}` | Poll async jobs |
-
-`POST /ideas` also accepts a natural-language `intent` (the NL-first input; `tech_stack` is now optional, at least one required) and returns idea cards enriched with `business_value` / `engineering_challenges` / `architectural_intent` / `tradeoffs`.
 | GET | `/health`, `/ready` | Liveness / Postgres ping |
 
-### Cartographer persistence
+`POST /ideas` accepts natural-language `intent` (or legacy `tech_stack`) and returns cards with `business_value` / `engineering_challenges` / `architectural_intent` / `tradeoffs`.
 
-| Backend | When | Store |
-|---------|------|--------|
-| `postgres` (default) | `CARTOGRAPH_STORE_BACKEND` unset or `postgres` | `PostgresJsonbStore` |
-| `neo4j` | `CARTOGRAPH_STORE_BACKEND=neo4j` | `Neo4jStore` via `get_cartograph_store()` |
+### Repository Intelligence persistence
 
-`app/api.py` always calls `get_cartograph_store()`. Flipping the env var is the only app change needed to persist graphs in Neo4j. The F3 React UI does not care which backend is behind GET `/cartograph/{run_id}`.
-
-Live Neo4j round-trip is covered by `tests/integration/test_neo4j_live.py`, skipped when Bolt is unreachable so CI stays hermetic.
+Analysis runs are stored in `analysis_runs` via `app.cartographer.analysis_store.PostgresJsonbStore` (JSONB: domain `Analysis` + structural `ProjectGraph`). Legacy tables `cartograph_runs` and `advisor_runs` remain in the schema but are no longer written to.
 
 ### Not done yet (do not confuse with the above)
 
-- **V4 Neo4j GraphRAG** (`BACKLOG.md`) — entity/relationship extraction into a knowledge graph, replacing `web_chunks`. Infra (Neo4j daemon) is ready; the product feature is not.
+- **V4 Neo4j GraphRAG** (`BACKLOG.md`) — entity/relationship extraction into a knowledge graph, replacing `web_chunks`. Infra may exist on the server; the product feature is not shipped.
 - **Google OAuth / JWT / key vault / per-user cache** — still deferred; anonymous user UUID.
 - **pgvector RAG pipeline** — `web_chunks` table exists; nothing writes or retrieves embeddings.
-- **Neo4j as the default CartographStore** — explicit later decision.
+- **Drop legacy DB tables** — optional migration to remove `cartograph_runs` / `advisor_runs`.
 
 ---
 
@@ -542,39 +528,25 @@ By the end of V3, you will have built and understood:
 
 ---
 
-# Post-V3 — F1–F4 (Complete)
+# Post-V3 — F1–F4 (Complete, consolidated 2026-08)
 
 Shipped on `main` after the reduced V3 set. Numbering is the feature series used in merge commits, not Jira keys.
 
 | Feature | What shipped |
 |---------|----------------|
-| **F1 Cartographer** | `POST /cartograph` + `GET /cartograph/{run_id}`. Graph persisted by `CartographStore`. Default backend: Postgres JSONB. |
-| **F1-4 Neo4j adapter** | `Neo4jStore` (native `:CartographRun` / `:GraphNode` / dynamic rels) and `get_cartograph_store()`. Selected with `CARTOGRAPH_STORE_BACKEND=neo4j`. |
-| **F2 Advisor** | `POST /advise` + `GET /advise/{run_id}` plus Streamlit Advisor page. |
-| **F3 React UI** | Vite/React/TS app in `web/`: Ideas, History, Cartographer (React Flow), Advisor. Same FastAPI backend. (Legacy Streamlit UI removed 2026-08-26.) |
-| **F4 Jobs** | In-process `create_job` / `get_job` / `run_job`. Opt-in `?async=true` on `/cartograph` and `/advise`; poll `GET /jobs/{job_id}`. |
+| **F1 Repository Intelligence** | `POST /analyze` + `GET /analyze/{run_id}` + `GET /analyses`. Evidence-first `Analysis` (findings + recommendations) + structural `ProjectGraph`. Persisted in `analysis_runs`. |
+| **F3 React UI** | Vite/React/TS in `web/`: Ideas, Repository Intelligence (`RepoIntelligence` 4-tab view), History. |
+| **F4 Jobs** | In-process `create_job` / `get_job` / `run_job`. Opt-in `?async=true` on `POST /analyze`; poll `GET /jobs/{job_id}`. |
 
-## Neo4j live store (2026-08-19)
-
-This is **not** GraphRAG. It is the Cartographer persistence backend plus server infra.
-
-1. Neo4j runs as Docker container `neo4j` (`neo4j:5`) on `global-network`, same network as `postgres`, `restart: unless-stopped`, ports `7474` / `7687`, volume `neo4j_data`.
-2. `Neo4jStore` save→get was smoke-tested against that instance (run-scoped merge keys, `ProjectGraph` round trip).
-3. `app/api.py` uses `get_cartograph_store()`.
-4. Default remains `CARTOGRAPH_STORE_BACKEND=postgres`. Documented in `.env.example` and README.
-5. Endpoint e2e (LLM mocked, real Neo4j) confirmed GET shape matches what the F3 UI already consumes.
-6. Gated live test: `tests/integration/test_neo4j_live.py`.
-7. **Not done:** flipping the default to Neo4j.
-
-Host Bolt URI: `neo4j://localhost:7687`. From another container on `global-network`: `neo4j://neo4j:7687`. Auth matches `NEO4J_AUTH` (default `neo4j/devstrom`).
+**Removed (2026-08):** separate Cartographer (`/cartograph`) and Advisor (`/advise`) flows, CartographStore/Neo4j cartograph backend, and dual UI tabs — superseded by Repository Intelligence.
 
 ---
 
 # V4 — Next
 
-Flagship: **Neo4j GraphRAG** in `BACKLOG.md` (entities/relationships from web context, vector index + traversal). That work can use the Neo4j daemon already running. Do not treat Cartographer's optional `Neo4jStore` as GraphRAG.
+Flagship: **Neo4j GraphRAG** in `BACKLOG.md` (entities/relationships from web context, vector index + traversal).
 
-Still deferred: Google OAuth/JWT, API key vault, pgvector retrieval, Redis/queue workers, making Neo4j the CartographStore default.
+Still deferred: Google OAuth/JWT, API key vault, pgvector retrieval, Redis/queue workers, dropping legacy `cartograph_runs` / `advisor_runs` tables.
 
 ---
 

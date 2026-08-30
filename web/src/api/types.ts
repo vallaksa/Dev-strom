@@ -87,7 +87,7 @@ export interface RunDetail {
   [key: string]: unknown;
 }
 
-// ── Project Cartographer ────────────────────────────────────────────────
+// ── Project graph (structural) ──────────────────────────────────────────
 
 export type NodeType =
   | "repo"

@@ -1,6 +1,10 @@
 # Dev-Strom
 
-**Get 1–5 concrete project ideas for any tech stack.** Enter a stack (e.g. LangChain, LangGraph); Dev-Strom searches the web for tutorials and articles, then uses an LLM to suggest project ideas—each with a problem statement, why it fits the stack, real-world value, and an implementation plan. Expand any idea for a detailed plan; export one as LLM-ready markdown.
+**Get concrete project ideas for any tech stack, and analyze repositories with evidence-backed findings.**
+
+Enter a stack (e.g. LangChain, LangGraph); Dev-Strom searches the web for tutorials and articles, then uses an LLM to suggest project ideas—each with a problem statement, why it fits the stack, real-world value, and an implementation plan. Expand any idea for a detailed plan; export one as LLM-ready markdown.
+
+**Repository Intelligence** clones and parses a repo, then returns an evidence-first analysis: findings with file/line citations, ranked recommendations, and an interactive architecture graph.
 
 ---
 
@@ -72,6 +76,16 @@ curl -X POST http://localhost:8000/export \
 python scripts/run_graph.py "React, Node.js" --count 5 --domain fintech --level beginner --enable-multi-query
 ```
 
+**Analyze a repository (Repository Intelligence):**
+
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"repo_url": "https://github.com/user/repo"}'
+```
+
+Returns `run_id`, evidence-backed `findings`, `recommendations`, and a structural `graph`. List past runs with `GET /analyses`; reload one with `GET /analyze/{run_id}`. Pass `?async=true` to schedule as a background job and poll `GET /jobs/{job_id}`.
+
 **Docs (when API is running):** [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger), [http://localhost:8000/redoc](http://localhost:8000/redoc) (ReDoc).
 
 ---
@@ -122,6 +136,29 @@ Final state: {tech_stack, web_context, ideas}
 3. **generate_ideas:** LangGraph node reads `tech_stack` and `web_context`, invokes the Deep Agent with a prompt; the agent returns JSON, which is parsed into `ProjectIdea` objects and written to `ideas` in state.
 4. **Output:** Final state contains `tech_stack`, `web_context`, and `ideas` (1–5 ideas per run, per requested count).
 
+### Repository Intelligence flow
+
+```
+Git URL or local path
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  POST /analyze  (app.cartographer.pipeline)                              │
+│                                                                          │
+│  resolve/clone → parse → aggregate (system graph)                        │
+│    │                                                                     │
+│    ▼                                                                     │
+│  analyze_findings (LLM, evidence-first)                                  │
+│    │  • Findings with file/line/symbol citations                         │
+│    │  • Recommendations ranked by impact/effort                          │
+│    ▼                                                                     │
+│  Persist to analysis_runs (Postgres JSONB)                               │
+└─────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+Analysis + ProjectGraph  →  RepoIntelligence UI (web/)
+```
+
 ### Layers
 
 | Layer | Role |
@@ -129,6 +166,7 @@ Final state: {tech_stack, web_context, ideas}
 | **LangGraph** | Orchestration: state and node order (fetch_web_context → generate_ideas). |
 | **LangChain** | Web search tool and prompts. |
 | **Deep Agents** | Idea generation inside the `generate_ideas` node (with optional middleware). |
+| **Cartographer package** | Internal ingest/parse/findings pipeline (`app/cartographer/`); powers `POST /analyze`. |
 
 **Output schema** (`schema.py`): Each idea has `name`, `problem_statement`, `why_it_fits` (list), `real_world_value`, `implementation_plan` (list of steps). 1–5 ideas per run (configurable). API returns a `run_id` (UUID) with each ideas response; use it for `POST /expand` and `POST /export` so state is per-run and safe for concurrent clients.
 
@@ -144,23 +182,22 @@ points; `migrations/` holds Alembic migrations.
 |------|---------|
 | `app/graph.py` | LangGraph pipeline: state, `fetch_web_context`, `generate_ideas`, `expand_idea`, model fallback chain. |
 | `app/tools.py` | LangChain web search tool (Tavily). |
-| `app/api.py` | FastAPI server: `POST /ideas`, `POST /expand`, `POST /export`, `GET /history`, `GET /runs/{run_id}`, `GET /health`, `GET /ready`. |
+| `app/api.py` | FastAPI server: ideas (`POST /ideas`, `/expand`, `/export`, `/history`), repository intelligence (`POST /analyze`, `GET /analyze/{run_id}`, `GET /analyses`), jobs (`GET /jobs/{job_id}`), health. |
+| `app/cartographer/` | Internal repo-ingest pipeline: `ingest`, `parse`, `aggregate`, `findings`, `analysis_store`, `pipeline`. |
 | `app/config.py` | Typed settings (`pydantic-settings`): API keys, `DATABASE_URL`, model + fallbacks, LangSmith config, log level. |
-| `app/models/domain.py` | AI output models: `ProjectIdea`, `IdeasResponse`, `ExpandedIdea`. |
-| `app/models/dto.py` | HTTP request DTOs: `IdeasRequest`, `ExpandRequest`, `ExportRequest`. |
+| `app/models/domain.py` | Domain models: `ProjectIdea`, `Analysis`, `Finding`, `Recommendation`, `Repository`. |
+| `app/models/dto.py` | HTTP request/response DTOs for FastAPI. |
 | `app/services/db.py` | Lazily-created SQLAlchemy engine, session factory, `get_session()` context manager, `ping()`. |
-| `app/services/models.py` | SQLAlchemy ORM models: `User`, `Run`, `ExpandedIdea` (and `web_chunks`, scaffolded — see [RAG status](#rag-status-web_chunks) below). |
+| `app/services/models.py` | SQLAlchemy ORM: `Run`, `ExpandedIdea`, `AnalysisRun`, `Job` (+ legacy `cartograph_runs` / `advisor_runs` tables, read-only). |
 | `app/services/run_service.py` | Run/expansion persistence: `save_run`, `save_expanded_idea`, `get_latest_expansion`, `load_history`, `get_run`. |
 | `app/services/export_formatter.py` | Idea + extended plan → LLM-ready Markdown for download. |
 | `web/` | React + Vite frontend: Ideas, Repository Intelligence, History. See [web/README.md](web/README.md). |
 | `scripts/run_graph.py` | CLI entry point with `--stream` and `--debug` flags. |
 | `scripts/test_web_search.py` | Smoke-tests the Tavily search tool in isolation. |
 | `migrations/` | Alembic migration environment and versions (`001_initial_schema.py`, ...). |
-| `docs/PLAN.md` | Full architecture plan (V1 → V3). |
-| `docs/V1_TICKETS.md` | V1 Jira-style tickets. |
-| `docs/V2_TICKETS.md` | V2 tickets (expand, export, multi-query, etc.). |
-| `docs/V3_TICKETS.md` | V3 tickets (auth, DB, RAG, MCP, React). |
-| `docs/Dev-Strom_API.postman_collection.json` | Postman collection for the API. |
+| `docs/PLAN.md` | Master architecture plan and roadmap. |
+| `docs/V3_TICKETS.md` | V3 Jira-style tickets. |
+| `docs/BACKLOG.md` | Deferred features (GraphRAG, auth, etc.). |
 
 ---
 
@@ -260,4 +297,4 @@ With `ENABLE_MCP=false`, idea generation behaves as before (no MCP tools).
 
 ## License and docs
 
-- **Plan and tickets:** [docs/PLAN.md](docs/PLAN.md), [docs/V1_TICKETS.md](docs/V1_TICKETS.md), [docs/V2_TICKETS.md](docs/V2_TICKETS.md), [docs/V3_TICKETS.md](docs/V3_TICKETS.md)
+- **Plan and tickets:** [docs/PLAN.md](docs/PLAN.md), [docs/V3_TICKETS.md](docs/V3_TICKETS.md), [docs/BACKLOG.md](docs/BACKLOG.md)
