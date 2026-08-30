@@ -58,6 +58,7 @@ class Run(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
+    slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -125,6 +126,7 @@ class CartographRun(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
+    slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     repo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     root_path: Mapped[str] = mapped_column(Text, nullable=False)
     project_graph: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -161,6 +163,7 @@ class AdvisorRun(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
+    slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     cartograph_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     repo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     advisor_report: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -190,6 +193,7 @@ class AnalysisRun(Base):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
+    slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     repo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     analysis: Mapped[dict] = mapped_column(JSONB, nullable=False)
     project_graph: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

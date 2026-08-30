@@ -43,7 +43,7 @@ V1–V3 (reduced V3 scope) and F1–F4 are in `main`. Cartographer still **defau
 ### What actually runs on the server
 
 ```
-Browser  →  React (web/, :5173) and/or Streamlit (ui/, :8501)
+Browser  →  React (web/, :5173)
                 │
                 ▼
          FastAPI (app.api, :8000)
@@ -186,7 +186,7 @@ V2 extends V1 with richer inputs, smarter web context, more control over output,
 - `@st.cache_data` added in `ui.py` for in-session caching (same inputs → instant result without API call).
 - `@lru_cache` on agent getters (`_get_idea_agent`, `_get_expand_agent`) for singleton agent objects (avoids repeated setup cost, not caching results).
 - Markdown fence stripping uses `\A` / `\Z` anchors (not `re.MULTILINE`) to avoid corrupting JSON responses from the LLM.
-- Streamlit originally called `graph_app.invoke()` directly. **Fixed in V3-1:** Streamlit talks to FastAPI over HTTP (`ui/api_client.py`).
+- V3-1 decoupled the frontend from the graph via FastAPI HTTP (originally Streamlit + `ui/api_client.py`; Streamlit removed 2026-08-26, superseded by `web/`).
 
 ---
 
@@ -551,7 +551,7 @@ Shipped on `main` after the reduced V3 set. Numbering is the feature series used
 | **F1 Cartographer** | `POST /cartograph` + `GET /cartograph/{run_id}`. Graph persisted by `CartographStore`. Default backend: Postgres JSONB. |
 | **F1-4 Neo4j adapter** | `Neo4jStore` (native `:CartographRun` / `:GraphNode` / dynamic rels) and `get_cartograph_store()`. Selected with `CARTOGRAPH_STORE_BACKEND=neo4j`. |
 | **F2 Advisor** | `POST /advise` + `GET /advise/{run_id}` plus Streamlit Advisor page. |
-| **F3 React UI** | Vite/React/TS app in `web/`: Ideas, History, Cartographer (React Flow), Advisor. Same FastAPI backend. Streamlit remains. |
+| **F3 React UI** | Vite/React/TS app in `web/`: Ideas, History, Cartographer (React Flow), Advisor. Same FastAPI backend. (Legacy Streamlit UI removed 2026-08-26.) |
 | **F4 Jobs** | In-process `create_job` / `get_job` / `run_job`. Opt-in `?async=true` on `/cartograph` and `/advise`; poll `GET /jobs/{job_id}`. |
 
 ## Neo4j live store (2026-08-19)

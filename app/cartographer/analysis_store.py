@@ -9,7 +9,6 @@ usage) — see those modules for the rationale.
 """
 
 import logging
-import uuid
 from abc import ABC, abstractmethod
 
 from sqlalchemy import select
@@ -17,6 +16,7 @@ from sqlalchemy import select
 from app.models.domain import Analysis
 from app.services.db import get_session
 from app.services.models import AnalysisRun
+from app.services.slugs import get_by_public_id, insert_with_unique_slug, public_id, slug_from_repo
 
 logger = logging.getLogger(__name__)
 
@@ -62,31 +62,28 @@ class PostgresJsonbStore(AnalysisStore):
         project_graph: dict | None = None,
         repo_url: str | None = None,
     ) -> str:
-        row = AnalysisRun(
-            repo_url=repo_url,
-            analysis=analysis.model_dump(mode="json"),
-            project_graph=project_graph,
+        repo = repo_url or (analysis.repository.url if analysis.repository else None)
+        root = analysis.repository.root_path if analysis.repository else None
+        run_id = insert_with_unique_slug(
+            AnalysisRun,
+            slug_from_repo(repo, root),
+            lambda _session, slug: AnalysisRun(
+                slug=slug,
+                repo_url=repo_url,
+                analysis=analysis.model_dump(mode="json"),
+                project_graph=project_graph,
+            ),
         )
-        with get_session() as session:
-            session.add(row)
-            session.flush()  # populate row.id before commit
-            run_id = str(row.id)
         logger.info("Saved analysis run %s (repo_url=%s)", run_id, repo_url)
         return run_id
 
     def get(self, run_id: str) -> dict | None:
-        try:
-            key = uuid.UUID(run_id)
-        except ValueError:
-            # A malformed (non-UUID) id is simply "not found", not a 500 — the
-            # /analyze/{run_id} route relies on None here to return its 404.
-            return None
         with get_session() as session:
-            row = session.get(AnalysisRun, key)
+            row = get_by_public_id(session, AnalysisRun, run_id)
             if row is None:
                 return None
             return {
-                "run_id": str(row.id),
+                "run_id": public_id(row),
                 "repo_url": row.repo_url,
                 "analysis": row.analysis,
                 "project_graph": row.project_graph,
@@ -106,7 +103,10 @@ class PostgresJsonbStore(AnalysisStore):
                 .offset(offset)
             )
             rows = session.execute(stmt).scalars().all()
-            return [summarize_analysis_row(str(r.id), r.repo_url, r.analysis, r.created_at.isoformat()) for r in rows]
+            return [
+                summarize_analysis_row(public_id(r), r.repo_url, r.analysis, r.created_at.isoformat())
+                for r in rows
+            ]
 
 
 def summarize_analysis_row(run_id: str, repo_url: str | None, analysis: dict | None, created_at: str) -> dict:

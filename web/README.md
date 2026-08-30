@@ -39,7 +39,7 @@ npm run preview   # serve the production build locally
 ## Demo mode
 
 The backend may not be running wherever this is reviewed (missing
-`OPENAI_API_KEY`/`TAVILY_API_KEY`, no Postgres, etc). **Demo mode** makes
+`API_KEY`/`TAVILY_API_KEY`, no Postgres, etc). **Demo mode** makes
 every page — especially the Cartographer graph — fully render and be
 interactable using local fixtures instead of live API calls.
 

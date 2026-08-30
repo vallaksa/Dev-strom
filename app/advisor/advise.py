@@ -25,6 +25,7 @@ from app.advisor.model import AdvisorReport
 from app.cartographer.model import ArchitectureReport, ProjectGraph
 from app.config import settings
 from app.graph import _extract_last_content, _invoke_with_fallback, _strip_markdown_fences
+from app.llm import chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +100,7 @@ tech debt, and risks, each grounded in evidence from the input.
 def _get_advisor_agent(model: str = MODEL):
     return create_deep_agent(
         name="improvement_advisor",
-        model=model,
+        model=chat_model(model),
         tools=[],
         system_prompt=_ADVISE_SYSTEM,
     )

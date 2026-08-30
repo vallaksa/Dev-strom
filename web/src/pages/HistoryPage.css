@@ -39,7 +39,11 @@
   padding: var(--space-4);
   border-bottom: var(--hairline) solid var(--border-soft);
   color: var(--ink-2);
-  white-space: nowrap;
+}
+
+.history-table__intent {
+  white-space: normal;
+  max-width: 420px;
 }
 
 .history-table tbody tr {

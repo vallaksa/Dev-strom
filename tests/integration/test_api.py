@@ -72,11 +72,11 @@ def test_ideas_requires_intent_or_tech_stack_returns_422(client):
     assert resp.status_code == 422
 
 
-def test_ideas_missing_openai_key_returns_503(client, monkeypatch):
+def test_ideas_missing_llm_key_returns_503(client, monkeypatch):
     # The 503 guard reads app.config.settings (a cached pydantic-settings
-    # singleton), not os.environ directly, so patch the settings field
-    # itself rather than the environment.
-    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+    # singleton), not os.environ directly, so patch the settings fields
+    # themselves rather than the environment.
+    monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
     assert resp.status_code == 503
 
@@ -108,6 +108,29 @@ def test_ideas_does_not_500_on_over_generation(client, monkeypatch):
         )
     assert resp.status_code == 200
     assert len(resp.json()["ideas"]) == requested
+
+
+def test_ideas_save_run_failure_still_returns_generated_ideas(client, monkeypatch):
+    """Generation succeeded; a down/misconfigured DB must not 500 the caller
+    out of the ideas they already paid an LLM call for."""
+    monkeypatch.setattr(
+        api_module,
+        "graph_app",
+        FakeGraphApp({"ideas": [make_idea(1)], "web_context": "ctx"}),
+    )
+
+    def boom(**kwargs):
+        raise ConnectionError("password authentication failed for user postgres")
+
+    monkeypatch.setattr(api_module, "save_run", boom)
+
+    resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["ideas"]) == 1
+    assert body["ideas"][0]["pid"] == 1
+    assert body["run_id"]
 
 
 def test_ideas_does_not_500_on_under_generation(client, monkeypatch):
@@ -152,10 +175,10 @@ def test_expand_happy_path(client, monkeypatch, sample_run):
     assert body["extended_plan"] == ["Step 1: do x", "Step 2: do y"]
 
 
-def test_expand_missing_openai_key_returns_503(client, monkeypatch, sample_run):
+def test_expand_missing_llm_key_returns_503(client, monkeypatch, sample_run):
     # As above: patch the settings singleton so the 503 guard actually
     # triggers, before the endpoint ever reaches get_run()/the database.
-    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+    monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/expand", json={"run_id": sample_run["run_id"], "pid": 1})
     assert resp.status_code == 503
 

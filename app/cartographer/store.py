@@ -23,6 +23,7 @@ from app.cartographer.model import ArchitectureReport, EdgeType, ProjectGraph
 from app.config import settings
 from app.services.db import get_session
 from app.services.models import CartographRun
+from app.services.slugs import get_by_public_id, insert_with_unique_slug, public_id, slug_from_repo
 
 logger = logging.getLogger(__name__)
 
@@ -63,28 +64,29 @@ class PostgresJsonbStore(CartographStore):
         project_graph: ProjectGraph,
         architecture_report: ArchitectureReport | None = None,
     ) -> str:
-        row = CartographRun(
-            repo_url=project_graph.repo_url,
-            root_path=project_graph.root_path,
-            project_graph=project_graph.model_dump(mode="json"),
-            architecture_report=(
-                architecture_report.model_dump(mode="json") if architecture_report else None
+        run_id = insert_with_unique_slug(
+            CartographRun,
+            slug_from_repo(project_graph.repo_url, project_graph.root_path),
+            lambda _session, slug: CartographRun(
+                slug=slug,
+                repo_url=project_graph.repo_url,
+                root_path=project_graph.root_path,
+                project_graph=project_graph.model_dump(mode="json"),
+                architecture_report=(
+                    architecture_report.model_dump(mode="json") if architecture_report else None
+                ),
             ),
         )
-        with get_session() as session:
-            session.add(row)
-            session.flush()  # populate row.id before commit
-            run_id = str(row.id)
         logger.info("Saved cartograph run %s (repo_url=%s)", run_id, project_graph.repo_url)
         return run_id
 
     def get(self, run_id: str) -> dict | None:
         with get_session() as session:
-            row = session.get(CartographRun, uuid.UUID(run_id))
+            row = get_by_public_id(session, CartographRun, run_id)
             if row is None:
                 return None
             return {
-                "run_id": str(row.id),
+                "run_id": public_id(row),
                 "repo_url": row.repo_url,
                 "root_path": row.root_path,
                 "project_graph": row.project_graph,
@@ -105,7 +107,7 @@ class PostgresJsonbStore(CartographStore):
             rows = session.execute(stmt).scalars().all()
             return [
                 {
-                    "run_id": str(r.id),
+                    "run_id": public_id(r),
                     "repo_url": r.repo_url,
                     "root_path": r.root_path,
                     "created_at": r.created_at.isoformat(),

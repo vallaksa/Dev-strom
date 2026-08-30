@@ -45,7 +45,7 @@ export function HistoryPage() {
             <table className="history-table">
               <thead>
                 <tr>
-                  <th>Run ID</th>
+                  <th>Run</th>
                   <th>Repository</th>
                   <th>Language</th>
                   <th>Status</th>
@@ -57,7 +57,7 @@ export function HistoryPage() {
               <tbody>
                 {analysisRows.map((a) => (
                   <tr key={a.run_id} onClick={() => navigate(`/analysis/${a.run_id}`)}>
-                    <td className="mono-cell">{a.run_id.slice(0, 12)}&hellip;</td>
+                    <td className="mono-cell">{a.run_id}</td>
                     <td>{repoLabel(a.repo_url)}</td>
                     <td>{a.language || "—"}</td>
                     <td>
@@ -90,10 +90,8 @@ export function HistoryPage() {
             <table className="history-table">
               <thead>
                 <tr>
-                  <th>Run ID</th>
-                  <th>Tech Stack</th>
-                  <th>Domain</th>
-                  <th>Level</th>
+                  <th>Run</th>
+                  <th>Intent</th>
                   <th>Count</th>
                   <th>Created</th>
                 </tr>
@@ -101,10 +99,8 @@ export function HistoryPage() {
               <tbody>
                 {ideas.data.runs.map((run) => (
                   <tr key={run.run_id} onClick={() => navigate(`/history/${run.run_id}`)}>
-                    <td className="mono-cell">{run.run_id.slice(0, 12)}&hellip;</td>
-                    <td>{run.tech_stack}</td>
-                    <td>{run.domain || "—"}</td>
-                    <td>{run.level || "—"}</td>
+                    <td className="mono-cell">{run.run_id}</td>
+                    <td className="history-table__intent">{run.tech_stack}</td>
                     <td>{run.count}</td>
                     <td>{formatDate(run.created_at)}</td>
                   </tr>

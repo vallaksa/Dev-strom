@@ -11,7 +11,7 @@ on:
 # Postgres instance.
 env:
   DATABASE_URL: postgresql://test:test@localhost:5432/devstrom_test
-  OPENAI_API_KEY: test-openai-key
+  API_KEY: test-api-key
   TAVILY_API_KEY: test-tavily-key
 
 jobs:

@@ -9,6 +9,7 @@ from langchain.agents.middleware import wrap_model_call
 from langgraph.graph import END, START, StateGraph
 
 from app.config import settings
+from app.llm import chat_model
 from app.models.domain import ProjectIdea
 from app.services.mcp_client import is_mcp_enabled, load_mcp_tools
 from app.services.models import ANONYMOUS_USER_ID
@@ -87,7 +88,7 @@ def _get_idea_agent(model: str = MODEL, use_mcp: bool = False):
     prompt = _IDEAS_SYSTEM_MCP if use_mcp else _IDEAS_SYSTEM
     return create_deep_agent(
         name="idea_generator",
-        model=model,
+        model=chat_model(model),
         tools=tools,
         system_prompt=prompt,
         middleware=[_log_model_call],
@@ -98,7 +99,7 @@ def _get_idea_agent(model: str = MODEL, use_mcp: bool = False):
 def _get_expand_agent(model: str = MODEL):
     return create_deep_agent(
         name="expand_idea",
-        model=model,
+        model=chat_model(model),
         tools=[],
         system_prompt=_EXPAND_SYSTEM,
     )

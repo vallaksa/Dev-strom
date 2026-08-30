@@ -3,9 +3,10 @@
     (url_or_path | run_id) -> ProjectGraph [+ ArchitectureReport] -> AdvisorReport
 
 Two entry paths, exactly one of which must be supplied by the caller:
-  - `run_id`: load an EXISTING cartograph run (its ProjectGraph and, if it
-    has one, its ArchitectureReport) from the CartographStore, and advise
-    against that - no re-clone/re-parse/re-analyze.
+  - `run_id`: load an EXISTING analysis or cartograph run (its ProjectGraph
+    and, if it has one, its ArchitectureReport) and advise against that —
+    no re-clone/re-parse/re-analyze. Analysis runs (what Cartographer saves
+    today) are tried first; cartograph_runs is the fallback.
   - `url_or_path`: run the full F1 pipeline fresh (`cartograph` then
     `analyze_architecture`), then advise against the freshly built graph.
 
@@ -21,27 +22,39 @@ from app.advisor.model import AdvisorReport
 from app.cartographer.analyze import analyze_architecture
 from app.cartographer.model import ArchitectureReport, ProjectGraph
 from app.cartographer.pipeline import cartograph
-from app.cartographer.store import PostgresJsonbStore
+from app.services.db import get_session
+from app.services.models import CartographRun
+from app.services.slugs import get_by_public_id
 
 logger = logging.getLogger(__name__)
 
 
-def _load_from_run(run_id: str) -> tuple[ProjectGraph, ArchitectureReport | None]:
-    """Load a previously persisted cartograph run and rehydrate its
-    ProjectGraph (required) and ArchitectureReport (optional - a run may
-    predate analysis, or analysis may have failed and produced no report).
+def _load_from_run(run_id: str) -> tuple[ProjectGraph, ArchitectureReport | None, str | None]:
+    """Load a previously persisted analysis or cartograph run.
+
+    Returns (graph, architecture_report, cartograph_row_uuid_or_none).
+    Analysis-sourced loads leave the cartograph UUID as None.
     """
-    store = PostgresJsonbStore()
-    record = store.get(run_id)
-    if record is None:
-        raise ValueError(f"Cartograph run {run_id} not found.")
+    from app.cartographer.analysis_store import PostgresJsonbStore as AnalysisStore
 
-    project_graph = ProjectGraph.model_validate(record["project_graph"])
-    architecture_report = None
-    if record.get("architecture_report"):
-        architecture_report = ArchitectureReport.model_validate(record["architecture_report"])
+    analysis_record = AnalysisStore().get(run_id)
+    if analysis_record is not None:
+        graph = analysis_record.get("project_graph")
+        if not graph:
+            raise ValueError(f"Analysis run {run_id} has no project graph to advise against.")
+        return ProjectGraph.model_validate(graph), None, None
 
-    return project_graph, architecture_report
+    with get_session() as session:
+        row = get_by_public_id(session, CartographRun, run_id)
+        if row is None:
+            raise ValueError(f"Run {run_id} not found.")
+        project_graph = ProjectGraph.model_validate(row.project_graph)
+        architecture_report = (
+            ArchitectureReport.model_validate(row.architecture_report)
+            if row.architecture_report
+            else None
+        )
+        return project_graph, architecture_report, str(row.id)
 
 
 def advise_repo_with_context(url_or_path: str | None = None, run_id: str | None = None) -> dict:
@@ -55,9 +68,8 @@ def advise_repo_with_context(url_or_path: str | None = None, run_id: str | None 
     "repo_url": str | None}.
     """
     if run_id:
-        logger.info("advise_repo: loading existing cartograph run %r", run_id)
-        project_graph, architecture_report = _load_from_run(run_id)
-        cartograph_run_id = run_id
+        logger.info("advise_repo: loading existing run %r", run_id)
+        project_graph, architecture_report, cartograph_run_id = _load_from_run(run_id)
     elif url_or_path:
         logger.info("advise_repo: running cartograph pipeline fresh for %r", url_or_path)
         project_graph = cartograph(url_or_path)

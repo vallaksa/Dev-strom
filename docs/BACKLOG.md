@@ -46,21 +46,21 @@ Full authentication stack deferred to focus on core features first. All features
 
 - **V3-4: Google OAuth2 + JWT service (backend)** — Register with Google Cloud, build the OAuth redirect flow, issue JWTs.
 - **V3-5: JWT middleware + protect API routes** — FastAPI `Depends(get_current_user)` on all data routes.
-- **V3-6: Streamlit login page + JWT session handling** — Auth gate pattern at the top of every Streamlit page.
+- **V3-6: React login page + JWT session handling** — Auth gate in the React app (`web/`).
 - **V3-7: API Key Vault — service + routes** — Encrypted storage for user-supplied OpenAI/Tavily keys using Fernet.
-- **V3-8: Streamlit Settings page (key management UI)** — UI for adding/removing API keys.
+- **V3-8: React Settings page (key management UI)** — UI for adding/removing API keys.
 - **V3-9: Wire graph + tools to use user-supplied keys** — Pull decrypted keys from DB instead of `.env` at runtime.
 - **V3-16: Per-user TTL caching layer** — `cachetools.TTLCache` scoped by user ID.
 
 ---
 
-## React Frontend (Deferred from V3)
+## React Frontend
 
-React frontend deferred until all backend features are complete and stable. Streamlit serves as the primary UI for the entire V3 milestone.
+React frontend shipped as F3 (`web/`): Ideas, History, Cartographer, Advisor. Auth and Settings pages remain in backlog.
 
-- **V3-17: React + Vite scaffold + routing + API client** — Project setup with Vite, React Router, and an HTTP client for the FastAPI backend.
+- **V3-17: React + Vite scaffold + routing + API client** — Done (F3).
 - **V3-18: React auth (login page + JWT flow)** — Google OAuth login page consuming the backend auth routes.
-- **V3-19: React Home + History + Settings pages** — Full React UI replacing Streamlit.
+- **V3-19: React Settings page** — Key management UI.
 
 ---
 
@@ -74,7 +74,7 @@ Items explicitly descoped from V3 with documented rationale.
 | Neo4j GraphRAG | V3 ships MCP dedup instead; Neo4j rewrite is the flagship V4 feature |
 | Pre-seeded RAG knowledge | Requires Neo4j infrastructure; deferred until GraphRAG is in place |
 | Google OAuth + JWT auth | Overhead for current stage; all features use anonymous user until auth is implemented |
-| React frontend | Streamlit is sufficient for V3; React rewrite after backend features are complete |
+| React frontend | Shipped as F3 (`web/`); Settings/auth still backlog |
 | Email + password login | Google OAuth only — password management (bcrypt, reset flow, email verification) adds complexity with no learning benefit |
 | Redis caching layer | `cachetools.TTLCache` in-process is sufficient for V3; Redis needed for multi-process / distributed deployment |
 | Multiple expansions history UI | Backend allows multiple expansions (no UNIQUE constraint); surfacing past expansions in the UI is a V4 UX feature |

@@ -113,14 +113,14 @@ export const sampleIdeas: Idea[] = [
 ];
 
 export const sampleIdeasResponse: IdeasResponse = {
-  run_id: "demo-run-ideas-0001",
+  run_id: "python-fastapi-react",
   ideas: sampleIdeas,
 };
 
 export const sampleHistoryResponse: HistoryResponse = {
   runs: [
     {
-      run_id: "demo-run-ideas-0001",
+      run_id: "python-fastapi-react",
       tech_stack: "Python, FastAPI, React",
       domain: "developer tools",
       level: "intermediate",
@@ -128,7 +128,7 @@ export const sampleHistoryResponse: HistoryResponse = {
       created_at: "2026-08-15T14:22:00Z",
     },
     {
-      run_id: "demo-run-ideas-0002",
+      run_id: "typescript-next-js",
       tech_stack: "TypeScript, Next.js",
       domain: "productivity",
       level: "beginner",
@@ -136,7 +136,7 @@ export const sampleHistoryResponse: HistoryResponse = {
       created_at: "2026-08-12T09:05:00Z",
     },
     {
-      run_id: "demo-run-cartograph-0001",
+      run_id: "python",
       tech_stack: "Python",
       domain: undefined,
       level: undefined,

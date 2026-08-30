@@ -192,8 +192,8 @@ def test_advise_core_modules_are_wired_on_import():
     assert api_module.get_advisor_run is not None
 
 
-def test_advise_missing_openai_key_returns_503(client, monkeypatch):
-    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+def test_advise_missing_api_key_returns_503(client, monkeypatch):
+    monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/advise", json={"repo_url": "https://github.com/example/repo"})
     assert resp.status_code == 503
 
@@ -283,8 +283,8 @@ def test_advise_async_job_records_error_on_pipeline_failure(client, monkeypatch)
     assert "clone failed" in record["error"]
 
 
-def test_advise_async_missing_openai_key_returns_503(client, monkeypatch):
-    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+def test_advise_async_missing_api_key_returns_503(client, monkeypatch):
+    monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post(
         "/advise",
         params={"async": "true"},

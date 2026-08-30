@@ -16,7 +16,9 @@ export function RunDetailPage() {
         &larr; Back to History
       </Link>
       <SectionMarker index="IV" label="Run Detail" />
-      <h1 className="run-detail-page__title">{runId}</h1>
+      <h1 className="run-detail-page__title">
+        {state.status === "success" ? state.data.tech_stack : runId}
+      </h1>
 
       {state.status === "loading" && <LoadingState label="Loading run" />}
       {state.status === "error" && <ErrorState message={state.error} onRetry={state.reload} />}
@@ -25,16 +27,8 @@ export function RunDetailPage() {
         <>
           <div className="card run-detail-page__meta">
             <div>
-              <span className="mono-label">Tech Stack</span>
+              <span className="mono-label">Intent</span>
               <p>{state.data.tech_stack}</p>
-            </div>
-            <div>
-              <span className="mono-label">Domain</span>
-              <p>{state.data.domain || "—"}</p>
-            </div>
-            <div>
-              <span className="mono-label">Level</span>
-              <p>{state.data.level || "—"}</p>
             </div>
             <div>
               <span className="mono-label">Created</span>

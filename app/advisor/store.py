@@ -8,7 +8,6 @@ Mirrors `app.cartographer.store` exactly (same interface shape, same
 """
 
 import logging
-import uuid
 from abc import ABC, abstractmethod
 
 from sqlalchemy import select
@@ -16,6 +15,7 @@ from sqlalchemy import select
 from app.advisor.model import AdvisorReport
 from app.services.db import get_session
 from app.services.models import AdvisorRun
+from app.services.slugs import get_by_public_id, insert_with_unique_slug, parse_uuid, public_id, slug_from_repo
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +61,16 @@ class PostgresJsonbStore(AdvisorStore):
         cartograph_run_id: str | None = None,
         repo_url: str | None = None,
     ) -> str:
-        row = AdvisorRun(
-            cartograph_run_id=uuid.UUID(cartograph_run_id) if cartograph_run_id else None,
-            repo_url=repo_url,
-            advisor_report=advisor_report.model_dump(mode="json"),
+        run_id = insert_with_unique_slug(
+            AdvisorRun,
+            slug_from_repo(repo_url),
+            lambda _session, slug: AdvisorRun(
+                slug=slug,
+                cartograph_run_id=parse_uuid(cartograph_run_id) if cartograph_run_id else None,
+                repo_url=repo_url,
+                advisor_report=advisor_report.model_dump(mode="json"),
+            ),
         )
-        with get_session() as session:
-            session.add(row)
-            session.flush()  # populate row.id before commit
-            run_id = str(row.id)
         logger.info(
             "Saved advisor run %s (cartograph_run_id=%s, repo_url=%s)",
             run_id, cartograph_run_id, repo_url,
@@ -78,11 +79,11 @@ class PostgresJsonbStore(AdvisorStore):
 
     def get(self, run_id: str) -> dict | None:
         with get_session() as session:
-            row = session.get(AdvisorRun, uuid.UUID(run_id))
+            row = get_by_public_id(session, AdvisorRun, run_id)
             if row is None:
                 return None
             return {
-                "run_id": str(row.id),
+                "run_id": public_id(row),
                 "cartograph_run_id": str(row.cartograph_run_id) if row.cartograph_run_id else None,
                 "repo_url": row.repo_url,
                 "advisor_report": row.advisor_report,
@@ -102,7 +103,7 @@ class PostgresJsonbStore(AdvisorStore):
             rows = session.execute(stmt).scalars().all()
             return [
                 {
-                    "run_id": str(r.id),
+                    "run_id": public_id(r),
                     "cartograph_run_id": str(r.cartograph_run_id) if r.cartograph_run_id else None,
                     "repo_url": r.repo_url,
                     "created_at": r.created_at.isoformat(),

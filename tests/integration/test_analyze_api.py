@@ -137,8 +137,8 @@ def test_analyze_rejects_both_sources(client):
     assert resp.status_code == 422
 
 
-def test_analyze_missing_openai_key_returns_503(client, monkeypatch):
-    monkeypatch.setattr(api_module.settings, "openai_api_key", None)
+def test_analyze_missing_llm_key_returns_503(client, monkeypatch):
+    monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/analyze", json={"repo_url": "https://github.com/example/repo"})
     assert resp.status_code == 503
 

@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { postIdeas } from "../api/ideas";
 import { IdeaCard } from "../components/IdeaCard";
 import { SectionMarker } from "../components/SectionMarker";
 import { ErrorState, LoadingState } from "../components/StateBlocks";
-import { useAsyncAction } from "../hooks/useAsyncAction";
+import { useIdeaGeneration } from "../hooks/useIdeaGeneration";
 import "./IdeasPage.css";
 
 const EXAMPLES = [
@@ -16,7 +15,7 @@ export function IdeasPage() {
   const [intent, setIntent] = useState("");
   const [count, setCount] = useState(3);
 
-  const [state, run] = useAsyncAction(postIdeas);
+  const [state, run] = useIdeaGeneration();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -97,7 +96,7 @@ export function IdeasPage() {
         {state.status === "success" && (
           <>
             <hr className="hr" />
-            <SectionMarker index="II" label={`${state.data.ideas.length} Ideas · Run ${state.data.run_id.slice(0, 8)}`} />
+            <SectionMarker index="II" label={`${state.data.ideas.length} Ideas · ${state.data.run_id}`} />
             <div className="ideas-grid">
               {state.data.ideas.map((idea) => (
                 <IdeaCard key={idea.pid} idea={idea} runId={state.data.run_id} />

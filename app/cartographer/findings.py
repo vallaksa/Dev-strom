@@ -31,6 +31,7 @@ from deepagents import create_deep_agent
 from app.cartographer.analyze import summarize_graph
 from app.config import settings
 from app.graph import _extract_last_content, _invoke_with_fallback, _strip_markdown_fences
+from app.llm import chat_model
 from app.models.domain import (
     Analysis,
     Evidence,
@@ -144,7 +145,7 @@ Prefer FEWER, well-grounded findings over many speculative ones.
 def _get_findings_agent(model: str = MODEL):
     return create_deep_agent(
         name="evidence_first_analyst",
-        model=model,
+        model=chat_model(model),
         tools=[],
         system_prompt=_FINDINGS_SYSTEM,
     )

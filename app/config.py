@@ -13,10 +13,14 @@ from functools import lru_cache
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.llm import load_llm_config, model_chain
+
+_LLM_PRIMARY, _LLM_FALLBACKS = model_chain(load_llm_config())
+
 
 class Settings(BaseSettings):
     """Environment-backed configuration. All fields are optional at import
-    time — endpoints that need a given key (e.g. OPENAI_API_KEY) validate
+    time — endpoints that need a given key (e.g. API_KEY) validate
     its presence themselves and return a 503 rather than crashing on import.
     """
 
@@ -27,7 +31,10 @@ class Settings(BaseSettings):
     )
 
     # ── provider keys ──────────────────────────────────────────────────────
-    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("API_KEY", "OPENROUTER_API_KEY", "OPENAI_API_KEY"),
+    )
     tavily_api_key: str | None = Field(default=None, alias="TAVILY_API_KEY")
 
     # ── database ───────────────────────────────────────────────────────────
@@ -45,11 +52,11 @@ class Settings(BaseSettings):
     cartograph_store_backend: str = Field(default="postgres", alias="CARTOGRAPH_STORE_BACKEND")
 
     # ── LLM model selection ────────────────────────────────────────────────
-    # Primary model used by the idea-generation and expand agents, with an
-    # ordered fallback chain tried in order if the primary call fails.
-    model: str = Field(default="gpt-5-mini", alias="DEVSTROM_MODEL")
+    # Defaults come from config/llm.json. Override with DEVSTROM_MODEL to
+    # switch without editing the file. Remaining listed models are fallbacks.
+    model: str = Field(default=_LLM_PRIMARY, alias="DEVSTROM_MODEL")
     model_fallbacks: list[str] = Field(
-        default_factory=lambda: ["gpt-4.1-mini", "gpt-4o-mini"],
+        default_factory=lambda: list(_LLM_FALLBACKS),
         alias="DEVSTROM_MODEL_FALLBACKS",
     )
 
