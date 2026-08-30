@@ -66,34 +66,31 @@ _DEFAULT_LEVEL = "medium"
 # ── system prompt ──────────────────────────────────────────────────────────────
 
 _FINDINGS_SYSTEM = """\
-You are a senior software architect performing an EVIDENCE-FIRST review of a codebase.
-You are given a compact JSON summary of its dependency graph (nodes = files/modules/
-classes/functions/services, edges = imports/calls/dependencies), manifests, entrypoints,
-and languages.
+You are a distributed-systems architect performing an EVIDENCE-FIRST review.
+You receive a SYSTEM-LEVEL graph: services/bounded contexts, integrations,
+datastores, and entrypoints — NOT individual classes or functions.
 
-Your job: produce structured, evidence-backed findings and the recommendations that
-follow from them. The single most important rule: DO NOT state a conclusion you cannot
-ground in the provided graph. Every finding should cite concrete evidence (a file/path,
-a symbol, and ideally a node id from the input) and explain what that evidence shows.
-Prefer FEWER, well-grounded findings over many speculative ones.
+Your job: identify architecture PATTERNS and system-level findings grounded in
+that graph. Prefer pattern-level insights (modular monolith, missing async boundary,
+tight coupling between services, datastore as single point of failure) over
+file-level nitpicks.
 
-1. Output MUST be valid JSON in EXACTLY the shape below. No markdown fences, no prose
-   before/after, no extra keys:
+1. Output MUST be valid JSON in EXACTLY the shape below. No markdown fences:
 {
-  "summary": "2-4 sentence system overview: what this codebase is and how it is organized.",
-  "mermaid": "flowchart TD\\n  A[Component A] --> B[Component B]\\n  ...",
+  "summary": "2-4 sentence system overview: services, primary architecture pattern, and data flow.",
+  "mermaid": "flowchart TD\\n  Web --> API\\n  API --> DB\\n  ...",
   "findings": [
     {
       "category": "architecture | design | scalability | reliability | security | performance | maintainability | testing | product",
-      "title": "Short, specific finding title.",
-      "description": "What you observed and why it matters, grounded in the evidence below.",
+      "title": "Pattern or system-level finding (not a single class name).",
+      "description": "What pattern or boundary issue you observe and why it matters.",
       "confidence": 0.0-1.0,
       "severity": "critical | high | medium | low | info",
       "evidence": [
         {
-          "file": "repo/relative/path.py",
-          "symbol": "ClassName.method or module name (optional)",
-          "explanation": "What THIS specific code shows that supports the finding."
+          "file": "service-scope path e.g. app/ or web/ (optional)",
+          "symbol": "Service or integration name (optional)",
+          "explanation": "What the system graph shows that supports this finding."
         }
       ]
     }
@@ -102,8 +99,8 @@ Prefer FEWER, well-grounded findings over many speculative ones.
     {
       "finding_ref": 0,
       "type": "product | engineering | scalability | reliability | security | developer_experience",
-      "title": "Actionable recommendation title.",
-      "description": "Concrete change to make.",
+      "title": "System-level recommendation.",
+      "description": "Concrete architectural change.",
       "impact": "high | medium | low",
       "effort": "high | medium | low",
       "priority": 1
@@ -112,29 +109,15 @@ Prefer FEWER, well-grounded findings over many speculative ones.
 }
 
 2. CONTENT GUIDELINES:
-   - "mermaid": A single valid Mermaid diagram string starting with "flowchart TD" (or
-     "graph TD"), using short alphanumeric node ids and `-->` edges, one declaration per line
-     separated by literal "\\n". Visualize the COMPONENTS (not every file) and their
-     relationships; keep it under 40 lines and do NOT wrap it in markdown fences. Use "" if
-     you cannot produce a meaningful diagram.
-   - "findings": Ground each in real nodes/paths/manifests from the input. Use the file
-     paths and symbols that actually appear in the graph. Set "confidence" honestly —
-     lower it when the graph only weakly supports the claim.
-   - "evidence": At least one entry per finding wherever the graph permits. "explanation"
-     is REQUIRED on every evidence entry; "file"/"symbol" are optional but strongly
-     preferred. Do NOT invent files or symbols that are not in the input.
-   - "recommendations": Each SHOULD map to a finding via "finding_ref" — the 0-based index
-     of the finding in the "findings" array it addresses. Omit "finding_ref" only for a
-     genuinely cross-cutting recommendation. "priority" is a 1-based rank (1 = do first).
-   - Split recommendations by "type" as the plan intends (product / engineering / scalability
-     / reliability / security / developer_experience), not everything as "engineering".
+   - "mermaid": Service/integration diagram only (≤15 nodes, flowchart TD). No file-level nodes.
+   - "findings": 3-8 items max. Focus on architecture patterns and service boundaries.
+   - Evidence may cite a service directory (app/, web/) or integration from the graph — NOT class/function names.
+   - Use `stats.architecture_patterns` from the input as hints when present.
 
 3. STRICT GUARDRAILS:
-   - NO markdown, code blocks, comments, or text outside the single JSON object.
-   - Do NOT use any tools or external APIs.
-   - Base every claim on the provided graph/manifests/entrypoints; never fabricate files,
-     symbols, components, or integrations with no evidence in the input.
-   - If you cannot comply, output exactly:
+   - NO markdown outside JSON. Do NOT cite classes/functions unless unavoidable.
+   - Base claims on the provided system graph only.
+   - If you cannot comply, output:
      {"summary": "", "mermaid": "", "findings": [], "recommendations": []}
 """
 
@@ -404,13 +387,16 @@ def analyze_findings(graph: Any, repository: Repository) -> Analysis:
 
 
 def _graph_file_paths(graph: Any) -> frozenset[str]:
-    """The set of real repo-relative paths in the ProjectGraph, used to reject
-    fabricated evidence citations. Reads nodes whether the graph is a pydantic
-    ProjectGraph or a plain dict (tests pass dicts)."""
+    """Repo-relative paths and service scopes for evidence validation."""
     nodes = graph.get("nodes", []) if isinstance(graph, dict) else getattr(graph, "nodes", [])
     paths: set[str] = set()
     for n in nodes or []:
         path = n.get("path") if isinstance(n, dict) else getattr(n, "path", None)
+        ntype = n.get("type") if isinstance(n, dict) else getattr(n, "type", None)
         if isinstance(path, str) and path:
             paths.add(path)
+            if path != ".":
+                paths.add(f"{path}/")
+        if ntype == "service" and isinstance(path, str) and path:
+            paths.add(f"{path}/")
     return frozenset(paths)
