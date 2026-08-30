@@ -44,10 +44,11 @@ def make_idea(n: int = 1) -> dict:
     """Build a valid ProjectIdea-shaped dict for use in tests."""
     return {
         "name": f"Idea {n}",
+        "pitch": f"Pitch for idea {n}.",
         "problem_statement": f"Problem statement {n}.",
         "why_it_fits": [f"Tech {n}: fits because of reason {n}."],
         "real_world_value": f"Saves time and money, scenario {n}.",
-        "implementation_plan": [f"Step {n}.1: set up.", f"Step {n}.2: build."],
+        "implementation_plan": [],
     }
 
 

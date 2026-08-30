@@ -6,6 +6,11 @@ These are shaped around the FastAPI contract, not the AI layer.
 from pydantic import BaseModel, Field, model_validator
 
 
+class PriorIdeaRef(BaseModel):
+    name: str
+    problem_statement: str
+
+
 # ── Requests ──────────────────────────────────────────────────────────────────
 
 class IdeasRequest(BaseModel):
@@ -17,7 +22,14 @@ class IdeasRequest(BaseModel):
     domain: str | None = None
     level: str | None = None
     enable_multi_query: bool = False
-    count: int = Field(default=3, ge=1, le=5)
+    count: int = Field(default=2, ge=1, le=5)
+    refinement_context: str | None = Field(
+        default=None, description="Optional extra context when generating more ideas"
+    )
+    prior_ideas: list[PriorIdeaRef] | None = Field(
+        default=None,
+        description="Ideas already shown in the UI; generation must avoid duplicates",
+    )
 
     @model_validator(mode="after")
     def _requires_intent_or_tech_stack(self) -> "IdeasRequest":

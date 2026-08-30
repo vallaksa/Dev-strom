@@ -9,15 +9,11 @@
 // ── Ideas ────────────────────────────────────────────────────────────────
 
 export interface IdeasRequest {
-  /**
-   * Natural-language description of what the user wants to build. The backend
-   * infers stack, domain, level, and complexity from this text — the caller no
-   * longer supplies those as structured fields.
-   */
   intent: string;
-  count?: number; // 1-5, optional; backend defaults
-  // ── Deprecated structured inputs (kept optional for backward compatibility
-  //    with older backends and persisted history) ──
+  refinement_context?: string;
+  prior_ideas?: Array<{ name: string; problem_statement: string }>;
+  /** @deprecated Ignored — backend always returns 2 cards per request */
+  count?: number;
   tech_stack?: string;
   domain?: string;
   level?: string;
@@ -27,10 +23,11 @@ export interface IdeasRequest {
 export interface Idea {
   pid: number;
   name: string;
+  pitch?: string;
   problem_statement: string;
   why_it_fits: string[];
   real_world_value: string;
-  implementation_plan: string[];
+  implementation_plan?: string[];
   // ── Engineering-intelligence fields (additive; may be absent on older runs) ──
   /** Concrete engineering problems this project forces you to solve. */
   engineering_challenges?: string[];

@@ -36,10 +36,13 @@ def _utcnow() -> datetime:
 
 class ProjectIdea(BaseModel):
     name: str = Field(..., description="Project name")
+    pitch: str = Field(default="", description="One-sentence hook")
     problem_statement: str = Field(..., description="1–2 sentences describing the problem")
     why_it_fits: list[str] = Field(..., description="Short bullets per tech in the stack")
     real_world_value: str = Field(..., description="One sentence on real-world value")
-    implementation_plan: list[str] = Field(..., description="3–5 high-level implementation steps")
+    implementation_plan: list[str] = Field(
+        default_factory=list, description="3–5 high-level steps; empty until Expand"
+    )
     # ── Engineering-context enrichment (optional; graceful degradation) ────────
     # Added so idea cards can "teach engineering while generating ideas" (plan
     # §3). Optional with defaults so older persisted ideas and the strict

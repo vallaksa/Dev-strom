@@ -1,9 +1,10 @@
 {
   "provider": "openrouter",
   "base_url": "https://openrouter.ai/api/v1",
-  "active": "stealth/ox-alpha",
+  "active": "z-ai/glm-5.3-flash",
+  "search_model": "perplexity/sonar",
   "models": [
-    "stealth/ox-alpha",
+    "z-ai/glm-5.3-flash",
     "nvidia/nemotron-3-ultra-550b-a55b:free"
   ]
 }

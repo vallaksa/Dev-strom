@@ -19,7 +19,7 @@ from tests.conftest import FakeGraphApp, make_idea
 
 
 def test_ideas_happy_path_returns_run_id_and_n_ideas(client, monkeypatch):
-    count = 3
+    count = 2
     monkeypatch.setattr(
         api_module,
         "graph_app",
@@ -33,7 +33,7 @@ def test_ideas_happy_path_returns_run_id_and_n_ideas(client, monkeypatch):
     body = resp.json()
     assert body["run_id"] == "run-happy-path"
     assert len(body["ideas"]) == count
-    assert [i["pid"] for i in body["ideas"]] == [1, 2, 3]
+    assert [i["pid"] for i in body["ideas"]] == [1, 2]
     assert body["ideas"][0]["name"] == "Idea 1"
 
 
@@ -72,29 +72,87 @@ def test_ideas_requires_intent_or_tech_stack_returns_422(client):
     assert resp.status_code == 422
 
 
-def test_ideas_missing_llm_key_returns_503(client, monkeypatch):
-    # The 503 guard reads app.config.settings (a cached pydantic-settings
-    # singleton), not os.environ directly, so patch the settings fields
-    # themselves rather than the environment.
+def test_ideas_missing_api_key_returns_503(client, monkeypatch):
     monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
     assert resp.status_code == 503
 
 
-def test_ideas_missing_tavily_key_returns_503(client, monkeypatch):
+def test_ideas_works_without_tavily_key(client, monkeypatch):
     monkeypatch.setattr(api_module.settings, "tavily_api_key", None)
-    resp = client.post("/ideas", json={"tech_stack": "Python", "count": 1})
-    assert resp.status_code == 503
-
-
-def test_ideas_does_not_500_on_over_generation(client, monkeypatch):
-    """Target behavior: the model over-generates (5 ideas for count=3) ->
-    the API should truncate to the requested count instead of 500ing."""
-    requested = 3
     monkeypatch.setattr(
         api_module,
         "graph_app",
-        FakeGraphApp({"ideas": [make_idea(i) for i in range(1, 6)], "web_context": "ctx"}),
+        FakeGraphApp({"ideas": [make_idea(1), make_idea(2)], "web_context": "ctx"}),
+    )
+    monkeypatch.setattr(api_module, "save_run", lambda **kwargs: "run-no-tavily")
+    resp = client.post("/ideas", json={"tech_stack": "Python"})
+    assert resp.status_code == 200
+    assert len(resp.json()["ideas"]) == 2
+
+
+def test_ideas_passes_prior_ideas_to_graph(client, monkeypatch):
+    fake_graph = _CapturingGraphApp({"ideas": [make_idea(1), make_idea(2)], "web_context": "ctx"})
+    monkeypatch.setattr(api_module, "graph_app", fake_graph)
+    monkeypatch.setattr(api_module, "save_run", lambda **kwargs: "run-prior")
+
+    resp = client.post(
+        "/ideas",
+        json={
+            "intent": "event-driven backend",
+            "prior_ideas": [
+                {"name": "Idea 1", "problem_statement": "Already shown problem."},
+            ],
+        },
+    )
+
+    assert resp.status_code == 200
+    assert fake_graph.inputs["prior_ideas"][0]["name"] == "Idea 1"
+
+
+def test_ideas_passes_refinement_context_to_graph(client, monkeypatch):
+    fake_graph = _CapturingGraphApp({"ideas": [make_idea(1), make_idea(2)], "web_context": "ctx"})
+    monkeypatch.setattr(api_module, "graph_app", fake_graph)
+    monkeypatch.setattr(api_module, "save_run", lambda **kwargs: "run-refine")
+
+    resp = client.post(
+        "/ideas",
+        json={"intent": "event-driven backend", "refinement_context": "beginner-friendly"},
+    )
+
+    assert resp.status_code == 200
+    assert fake_graph.inputs["refinement_context"] == "beginner-friendly"
+
+
+def test_expand_persists_implementation_plan_on_run(client, monkeypatch, sample_run):
+    saved = {}
+
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(
+        api_module,
+        "graph_expand_idea",
+        lambda idea: {
+            "idea": {**idea, "implementation_plan": ["Step 1: build"]},
+            "extended_plan": ["x"],
+        },
+    )
+    monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: saved.update(kwargs) or "exp-1")
+    monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: saved.update({"update": kwargs}))
+
+    resp = client.post("/expand", json={"run_id": sample_run["run_id"], "pid": 1})
+
+    assert resp.status_code == 200
+    assert saved["update"]["idea"]["implementation_plan"] == ["Step 1: build"]
+
+
+def test_ideas_does_not_500_on_over_generation(client, monkeypatch):
+    """Target behavior: the model over-generates (3 ideas for count=2) ->
+    the API should truncate to 2 instead of 500ing."""
+    requested = 2
+    monkeypatch.setattr(
+        api_module,
+        "graph_app",
+        FakeGraphApp({"ideas": [make_idea(i) for i in range(1, 4)], "web_context": "ctx"}),
     )
     monkeypatch.setattr(api_module, "save_run", lambda **kwargs: "run-over-gen")
 
@@ -134,9 +192,9 @@ def test_ideas_save_run_failure_still_returns_generated_ideas(client, monkeypatc
 
 
 def test_ideas_does_not_500_on_under_generation(client, monkeypatch):
-    """Target behavior: the model under-generates (1 idea for count=3) ->
+    """Target behavior: the model under-generates (1 idea for count=2) ->
     the API should keep what it got instead of 500ing."""
-    requested = 3
+    requested = 2
     monkeypatch.setattr(
         api_module,
         "graph_app",
@@ -162,6 +220,7 @@ def test_ideas_does_not_500_on_under_generation(client, monkeypatch):
 def test_expand_happy_path(client, monkeypatch, sample_run):
     monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
     monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: "expanded-1")
+    monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: None)
     monkeypatch.setattr(
         api_module,
         "graph_expand_idea",
@@ -175,9 +234,7 @@ def test_expand_happy_path(client, monkeypatch, sample_run):
     assert body["extended_plan"] == ["Step 1: do x", "Step 2: do y"]
 
 
-def test_expand_missing_llm_key_returns_503(client, monkeypatch, sample_run):
-    # As above: patch the settings singleton so the 503 guard actually
-    # triggers, before the endpoint ever reaches get_run()/the database.
+def test_expand_missing_api_key_returns_503(client, monkeypatch, sample_run):
     monkeypatch.setattr(api_module.settings, "api_key", None)
     resp = client.post("/expand", json={"run_id": sample_run["run_id"], "pid": 1})
     assert resp.status_code == 503
@@ -207,6 +264,7 @@ def test_export_current_behavior_returns_markdown_with_attachment_header(client,
     monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
     monkeypatch.setattr(api_module, "get_latest_expansion", lambda *, run_id, pid: None)
     monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: "expanded-1")
+    monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: None)
     monkeypatch.setattr(
         api_module,
         "graph_expand_idea",

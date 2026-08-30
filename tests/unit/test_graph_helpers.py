@@ -47,10 +47,10 @@ def test_strip_markdown_fences_does_not_touch_inner_backticks():
 def _valid_idea(n: int) -> dict:
     return {
         "name": f"Idea {n}",
+        "pitch": f"Pitch {n}",
         "problem_statement": f"Problem {n}",
         "why_it_fits": [f"Tech {n}: reason"],
         "real_world_value": f"Value {n}",
-        "implementation_plan": [f"Step {n}"],
     }
 
 
@@ -115,6 +115,13 @@ def test_parse_ideas_preserves_engineering_enrichment_fields():
     assert result[0]["engineering_challenges"] == ["Idempotency", "Event ordering"]
     assert result[0]["architectural_intent"].startswith("Event-driven")
     assert result[0]["tradeoffs"] == ["Eventual consistency"]
+
+
+def test_parse_ideas_without_implementation_plan():
+    raw = json.dumps({"ideas": [_valid_idea(1)]})
+    result = _parse_ideas(raw, expected_count=1)
+    assert len(result) == 1
+    assert result[0]["implementation_plan"] == []
 
 
 def test_parse_ideas_defaults_enrichment_fields_when_absent():

@@ -53,6 +53,13 @@ export function IdeaCard({ idea, runId }: { idea: Idea; runId: string }) {
       </div>
       <h3>{idea.name}</h3>
 
+      {idea.pitch && (
+        <>
+          <p className="idea-card__label mono-label accent">Pitch</p>
+          <p>{idea.pitch}</p>
+        </>
+      )}
+
       <p className="idea-card__label mono-label">Real-World Problem</p>
       <p>{idea.problem_statement}</p>
 
@@ -95,16 +102,31 @@ export function IdeaCard({ idea, runId }: { idea: Idea; runId: string }) {
       <p className="idea-card__label mono-label">Real-World Value</p>
       <p>{value}</p>
 
-      <p className="idea-card__label mono-label">Implementation Plan</p>
-      <ol>
-        {idea.implementation_plan.map((step, i) => (
-          <li key={i}>{step}</li>
-        ))}
-      </ol>
+      {(idea.implementation_plan?.length ?? 0) > 0 && (
+        <>
+          <p className="idea-card__label mono-label">Implementation Plan</p>
+          <ol>
+            {idea.implementation_plan!.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </>
+      )}
 
       {expanded && (
         <div className="idea-card__expansion">
           <hr className="hr" />
+          {expandState.status === "success" &&
+            (expandState.data.idea.implementation_plan?.length ?? 0) > 0 && (
+              <>
+                <p className="idea-card__label mono-label accent">Implementation Plan</p>
+                <ol>
+                  {expandState.data.idea.implementation_plan!.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ol>
+              </>
+            )}
           <p className="idea-card__label mono-label accent">Extended Plan</p>
           {expandState.status === "loading" && <span className="mono-label">Expanding&hellip;</span>}
           {expandState.status === "error" && <p className="error-text">{expandState.error}</p>}

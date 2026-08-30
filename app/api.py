@@ -32,6 +32,7 @@ from app.services.run_service import (
     load_history,
     save_expanded_idea,
     save_run,
+    update_run_idea,
 )
 
 # ── Project Cartographer (F1) ────────────────────────────────────────────────
@@ -120,19 +121,17 @@ api = FastAPI(title="Dev-Strom")
 @api.post("/ideas")
 def post_ideas(body: IdeasRequest):
     """Generate project ideas and persist the run to the database."""
-    if not settings.api_key or not settings.tavily_api_key:
+    if not settings.api_key:
         raise HTTPException(
             status_code=503,
-            detail="Set API_KEY and TAVILY_API_KEY in .env",
+            detail="Set API_KEY (or OPENROUTER_API_KEY / OPENAI_API_KEY) in .env",
         )
 
     intent = body.intent.strip() if body.intent and body.intent.strip() else None
-    # `tech_stack` may be omitted when an NL `intent` is given (validated by
-    # IdeasRequest). Fall back to the intent text so web search + storage still
-    # have a query, and pass the raw intent through so the graph can reason on it.
     effective_stack = (body.tech_stack.strip() if body.tech_stack and body.tech_stack.strip() else intent) or ""
 
-    inputs = {"tech_stack": effective_stack, "count": body.count}
+    requested_count = 2
+    inputs = {"tech_stack": effective_stack, "count": requested_count}
     if intent:
         inputs["intent"] = intent
     if body.domain and body.domain.strip():
@@ -141,27 +140,28 @@ def post_ideas(body: IdeasRequest):
         inputs["level"] = body.level.strip()
     if body.enable_multi_query:
         inputs["enable_multi_query"] = True
+    if body.refinement_context and body.refinement_context.strip():
+        inputs["refinement_context"] = body.refinement_context.strip()
+    if body.prior_ideas:
+        inputs["prior_ideas"] = [
+            {"name": p.name, "problem_statement": p.problem_statement}
+            for p in body.prior_ideas
+        ]
 
     result = graph_app.invoke(inputs)
     ideas = result.get("ideas", [])
 
-    # The graph already pads short results with empty ideas (see
-    # app.graph.generate_ideas), so a count mismatch here is benign: the
-    # model occasionally over- or under-generates. Never 500 for this —
-    # truncate if we got too many, and keep whatever we got if we got too
-    # few (the caller can retry expand/export against fewer pids).
-    if len(ideas) > body.count:
+    if len(ideas) > requested_count:
         logger.warning(
-            "Model returned %d ideas, requested %d; truncating.", len(ideas), body.count
+            "Model returned %d ideas, requested %d; truncating.", len(ideas), requested_count
         )
-        ideas = ideas[: body.count]
-    elif len(ideas) < body.count:
+        ideas = ideas[:requested_count]
+    elif len(ideas) < requested_count:
         logger.warning(
             "Model returned %d ideas, requested %d; keeping what came back.",
-            len(ideas), body.count,
+            len(ideas), requested_count,
         )
 
-    # Attach 1-based position IDs
     out = []
     for i, idea in enumerate(ideas, 1):
         d = idea if isinstance(idea, dict) else (
@@ -177,7 +177,7 @@ def post_ideas(body: IdeasRequest):
             tech_stack=effective_stack,
             domain=inputs.get("domain"),
             level=inputs.get("level"),
-            count=body.count,
+            count=requested_count,
             enable_multi_query=body.enable_multi_query,
             ideas=out,
             web_context=result.get("web_context"),
@@ -220,7 +220,9 @@ def post_expand(body: ExpandRequest):
     idea.pop("pid", None)
     result = graph_expand_idea(idea)
 
-    # Persist expanded idea to database
+    expanded_idea = result.get("idea", idea)
+    update_run_idea(run_id=body.run_id, pid=body.pid, idea=expanded_idea)
+
     save_expanded_idea(
         run_id=body.run_id,
         pid=body.pid,
@@ -260,6 +262,10 @@ def post_export(body: ExportRequest):
     latest = get_latest_expansion(run_id=body.run_id, pid=body.pid)
     if latest is not None:
         extended_plan = latest["extended_plan"]
+        run = get_run(run_id=body.run_id)
+        assert run is not None
+        idea = run["ideas"][body.pid - 1].copy()
+        idea.pop("pid", None)
     else:
         logger.info(
             "No persisted expansion for run_id=%s pid=%s; expanding on demand.",
@@ -267,6 +273,8 @@ def post_export(body: ExportRequest):
         )
         expanded = graph_expand_idea(idea)
         extended_plan = expanded.get("extended_plan", [])
+        idea = expanded.get("idea", idea)
+        update_run_idea(run_id=body.run_id, pid=body.pid, idea=idea)
         save_expanded_idea(
             run_id=body.run_id,
             pid=body.pid,

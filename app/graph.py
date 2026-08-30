@@ -13,7 +13,7 @@ from app.llm import chat_model
 from app.models.domain import ProjectIdea
 from app.services.mcp_client import is_mcp_enabled, load_mcp_tools
 from app.services.models import ANONYMOUS_USER_ID
-from app.tools import web_search_project_ideas
+from app.services.web_context import fetch_real_world_problems
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,8 @@ class DevStromStateOptional(TypedDict, total=False):
     level: str
     enable_multi_query: bool
     count: int
+    refinement_context: str
+    prior_ideas: list[dict]
 
 
 class DevStromState(DevStromStateRequired, DevStromStateOptional):
@@ -138,23 +140,19 @@ You are a strictly-controlled project-idea generator for developers learning a t
 Follow these instructions exactly and obey all guardrails:
 
 1. Output MUST be valid JSON, using ONLY the exact shape below. Do NOT include markdown code fences, explanations, headings, or any extra text.
-2. Generate exactly N concrete project ideas (N is given in the user message). No more, no less.
+2. Generate exactly 2 concrete project ideas (one per real-world problem in the web context). No more, no less.
 3. Use THIS JSON shape, and nothing else:
 {
   "ideas": [
     {
       "name": "Project Title",
-      "problem_statement": "Clear, 1-2 sentence definition of the business problem.",
+      "pitch": "One-sentence hook for why this project is compelling.",
+      "problem_statement": "Clear, 1-2 sentence definition of the real-world business problem.",
       "why_it_fits": [
         "Tech Name: Specific reason why this tech is the industry standard for this problem.",
         "Tech Name: Another specific reason..."
       ],
       "real_world_value": "One sentence on the business impact (e.g. revenue, efficiency, risk).",
-      "implementation_plan": [
-        "Step 1: Architect/Setup...",
-        "Step 2: Core Logic...",
-        "Step 3: Integration/Polish..."
-      ],
       "business_value": "One sentence on the concrete business/real-world value this delivers.",
       "engineering_challenges": [
         "A hard engineering problem this project forces you to solve (e.g. idempotency).",
@@ -170,10 +168,11 @@ Follow these instructions exactly and obey all guardrails:
 
 4. CONTENT GUIDELINES:
    - "name": Short, professional project title.
-   - "problem_statement": 1–2 sentences describing what problem the project solves.
+   - "pitch": One compelling sentence summarizing the opportunity.
+   - "problem_statement": Ground each idea in one of the real-world problems from the web context.
    - "why_it_fits": Each string MUST start with the Tech Name followed by a colon. Do not list generic benefits; link the tech to the specific domain problem. Aim for one bullet per key tech.
    - "real_world_value": Focus on business value (cost, speed, accuracy, risk), not just coding practice.
-   - "implementation_plan": 3–5 high-level, actionable steps that a developer could realistically follow.
+   - Do NOT include "implementation_plan" — that is generated later on Expand.
    - "business_value": One sentence on concrete real-world value; may restate real_world_value more specifically.
    - "engineering_challenges": 2–4 specific, non-generic engineering problems the project surfaces (idempotency, event ordering, retry semantics, distributed state, etc.). The goal is to TEACH engineering, not just list features.
    - "architectural_intent": 1–2 sentences explaining WHY the architecture is shaped this way (the design reasoning), not just what it is.
@@ -189,7 +188,7 @@ Follow these instructions exactly and obey all guardrails:
    - If Level = "Advanced" / "Architect": Focus on distributed systems patterns (CAP theorem, event sourcing, caching strategies, idempotency), scalability, reliability, and fault tolerance.
 
 7. DISTINCT IDEAS:
-   - All N ideas must be meaningfully different from each other (different core problem, architecture, or primary focus), even when using the same tech stack and domain.
+   - Both ideas must be meaningfully different from each other (different core problem, architecture, or primary focus), each grounded in a distinct real-world problem from the web context.
 
 8. STRICT GUARDRAILS:
    - NO markdown, code blocks, comments, or text before/after/beside the JSON.
@@ -218,17 +217,20 @@ _IDEAS_SYSTEM_MCP = _IDEAS_SYSTEM.replace(
 """
 
 _EXPAND_SYSTEM = """\
-You are an implementation advisor. Given a project idea (name, problem_statement, implementation_plan), \
-expand it into exactly 5 concise, actionable next steps a developer can follow.
+You are an implementation advisor. Given a project idea (name, pitch, problem_statement, and optional context fields), \
+produce a high-level implementation plan and a deeper 5-step extended plan.
 
 Rules:
 - Output valid JSON only, no markdown fences or extra text.
-- Each step must be ONE sentence (max 30 words). Be specific and technical.
-- Use this exact shape: {"extended_plan": ["Step 1: ...", "Step 2: ...", "Step 3: ...", "Step 4: ...", "Step 5: ..."]}
+- "implementation_plan": 3–5 high-level, actionable steps.
+- "extended_plan": exactly 5 concise, actionable next steps (one sentence each, max 30 words).
+- Use this exact shape:
+{"implementation_plan": ["Step 1: ...", "..."], "extended_plan": ["Step 1: ...", "Step 2: ...", "Step 3: ...", "Step 4: ...", "Step 5: ..."]}
 """
 
 _EMPTY_IDEA: dict = {
     "name": "",
+    "pitch": "",
     "problem_statement": "",
     "why_it_fits": [],
     "real_world_value": "",
@@ -240,14 +242,14 @@ _EMPTY_IDEA: dict = {
 }
 
 
+IDEAS_PER_RUN = 2
+
+
 # ── graph nodes ───────────────────────────────────────────────────────────────
 
 def fetch_web_context(state: DevStromState) -> dict:
-    result = web_search_project_ideas.invoke({
-        "tech_stack": state["tech_stack"],
-        "enable_multi_query": state.get("enable_multi_query", False),
-        "domain": state.get("domain"),
-    })
+    intent = state.get("intent") or state["tech_stack"]
+    result = fetch_real_world_problems(intent)
     return {"web_context": result or ""}
 
 
@@ -266,25 +268,43 @@ def _parse_ideas(raw: str, expected_count: int) -> list[dict]:
 def generate_ideas(state: DevStromState) -> dict:
     tech_stack = state["tech_stack"]
     web_context = state["web_context"]
-    count = max(1, min(5, state.get("count", 3)))
+    count = IDEAS_PER_RUN
 
     parts = [
         f"Tech stack: {tech_stack}",
         f"user_id: {ANONYMOUS_USER_ID}",
     ]
-    # Natural-language intent (plan §2): when the user described what they want
-    # in prose, hand it to the model as the primary ask and let it infer the
-    # technologies/domain/complexity itself, rather than forcing structured fields.
     if intent := state.get("intent"):
         parts.append(
             f"User's request (natural language): {intent}\n"
             "Infer the appropriate technologies, domain, and complexity from this request."
         )
+    if refinement := state.get("refinement_context"):
+        parts.append(
+            f"User refinement (additional context for this generation): {refinement}\n"
+            "Shape the ideas according to this refinement while staying grounded in the web context."
+        )
+    if prior := state.get("prior_ideas"):
+        lines = [
+            f"- {p.get('name', '')}: {p.get('problem_statement', '')}"
+            for p in prior
+            if isinstance(p, dict) and p.get("name")
+        ]
+        if lines:
+            parts.append(
+                "Ideas already generated in this session (must NOT repeat or closely paraphrase):\n"
+                + "\n".join(lines)
+                + "\nProduce two NEW ideas with distinct problems and titles."
+            )
     if domain := state.get("domain"):
         parts.append(f"Domain (bias ideas toward): {domain}")
     if level := state.get("level"):
         parts.append(f"Level (bias ideas toward): {level}")
-    parts.append(f"\nWeb context:\n{web_context[:4000]}\n\nOutput exactly {count} ideas as JSON:\n")
+    parts.append(
+        f"\nReal-world problems from live web context:\n{web_context[:4000]}\n\n"
+        f"Output exactly {count} ideas as JSON — one card per real-world problem. "
+        "Do NOT include implementation_plan.\n"
+    )
 
     # Preserve both: MCP tool selection (per is_mcp_enabled) AND the model
     # fallback chain. The lambda binds use_mcp so _invoke_with_fallback only
@@ -305,10 +325,14 @@ def generate_ideas(state: DevStromState) -> dict:
 # ── standalone utility (not part of the compiled graph) ──────────────────────
 
 def expand_idea(idea: dict) -> dict:
-    """Expand a single project idea into a deeper implementation plan."""
-    # Option A: strip fields the expand agent doesn't need to reduce input tokens
+    """Expand a single project idea into implementation_plan + extended_plan."""
     trimmed = {
-        k: idea[k] for k in ("name", "problem_statement", "implementation_plan")
+        k: idea[k]
+        for k in (
+            "name", "pitch", "problem_statement", "why_it_fits", "real_world_value",
+            "engineering_challenges", "architectural_intent", "tradeoffs", "business_value",
+            "implementation_plan",
+        )
         if k in idea
     }
     user_content = f"Expand this project idea:\n{json.dumps(trimmed)}"
@@ -317,14 +341,21 @@ def expand_idea(idea: dict) -> dict:
     )
 
     content = _strip_markdown_fences(_extract_last_content(result))
+    updated = idea.copy()
     try:
         data = json.loads(content)
+        impl = data.get("implementation_plan", [])
         steps = data.get("extended_plan", [])
+        if isinstance(impl, list) and impl:
+            updated["implementation_plan"] = [str(s) for s in impl]
         if isinstance(steps, list):
-            return {"idea": idea, "extended_plan": [str(s) for s in steps]}
+            return {
+                "idea": updated,
+                "extended_plan": [str(s) for s in steps],
+            }
     except Exception:
         pass
-    return {"idea": idea, "extended_plan": []}
+    return {"idea": updated, "extended_plan": []}
 
 
 # ── graph assembly ────────────────────────────────────────────────────────────

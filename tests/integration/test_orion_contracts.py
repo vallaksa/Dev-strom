@@ -45,10 +45,10 @@ def test_ideas_request_prefers_explicit_tech_stack_over_intent():
 def test_project_idea_accepts_orion_rich_fields():
     idea = ProjectIdea(
         name="Payment Recovery",
+        pitch="Recover revenue from failed checkouts automatically.",
         problem_statement="Recover failed payment flows.",
         why_it_fits=["Kafka: event backbone"],
         real_world_value="Reduces lost revenue.",
-        implementation_plan=["Model events", "Add workers"],
         engineering_challenges=["Idempotency", "Event ordering"],
         architectural_intent="Event-sourced recovery with audit trail",
         tradeoffs=["Higher ops complexity for stronger guarantees"],

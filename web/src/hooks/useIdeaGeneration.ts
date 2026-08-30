@@ -1,12 +1,28 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { postIdeas } from "../api/ideas";
 import { ApiError } from "../api/client";
-import type { IdeasRequest, IdeasResponse } from "../api/types";
-import type { AsyncState } from "./useAsyncAction";
+import type { Idea, IdeasRequest, IdeasResponse } from "../api/types";
 
-type GenerationState = AsyncState<IdeasResponse>;
+export interface IdeaBatch {
+  batchId: number;
+  runId: string;
+  label: string;
+  ideas: Idea[];
+}
+
+type GenerationState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; error: string }
+  | { status: "success"; batches: IdeaBatch[]; appendError?: string };
+
+export type GenerateIdeasOptions = {
+  /** When true, append to prior batches; otherwise replace them. */
+  append?: boolean;
+};
 
 let state: GenerationState = { status: "idle" };
+let batchCounter = 0;
 let requestId = 0;
 const listeners = new Set<() => void>();
 
@@ -25,29 +41,61 @@ function getSnapshot(): GenerationState {
   return state;
 }
 
-export async function generateIdeas(body: IdeasRequest): Promise<IdeasResponse | undefined> {
+function batchLabel(): string {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function appendBatch(data: IdeasResponse): IdeaBatch {
+  batchCounter += 1;
+  return {
+    batchId: batchCounter,
+    runId: data.run_id,
+    label: `Batch ${batchCounter} · ${batchLabel()}`,
+    ideas: data.ideas,
+  };
+}
+
+export async function generateIdeas(
+  body: IdeasRequest,
+  options: GenerateIdeasOptions = {},
+): Promise<IdeasResponse | undefined> {
+  const append = options.append ?? false;
   const id = ++requestId;
+  const priorBatches = append && state.status === "success" ? state.batches : [];
+  if (!append) {
+    batchCounter = 0;
+  }
   state = { status: "loading" };
   emit();
   try {
     const data = await postIdeas(body);
     if (requestId === id) {
-      state = { status: "success", data };
+      const batch = appendBatch(data);
+      state = { status: "success", batches: append ? [...priorBatches, batch] : [batch] };
       emit();
     }
     return data;
   } catch (err) {
     if (requestId === id) {
       const message = err instanceof ApiError ? err.message : "Something went wrong. Please try again.";
-      state = { status: "error", error: message };
+      state =
+        append && priorBatches.length > 0
+          ? { status: "success", batches: priorBatches, appendError: message }
+          : { status: "error", error: message };
       emit();
     }
     return undefined;
   }
 }
 
-export function useIdeaGeneration(): [GenerationState, (body: IdeasRequest) => Promise<IdeasResponse | undefined>] {
+export function useIdeaGeneration(): [
+  GenerationState,
+  (body: IdeasRequest, options?: GenerateIdeasOptions) => Promise<IdeasResponse | undefined>,
+] {
   const current = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  const run = useCallback((body: IdeasRequest) => generateIdeas(body), []);
+  const run = useCallback(
+    (body: IdeasRequest, options?: GenerateIdeasOptions) => generateIdeas(body, options),
+    [],
+  );
   return [current, run];
 }
