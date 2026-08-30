@@ -19,20 +19,15 @@ import { graphNodeTypes, type GraphNodeData } from "./GraphNode";
 import { Legend } from "./Legend";
 import "./CartographGraph.css";
 
-const ALL_TYPES: NodeType[] = [
+const SYSTEM_TYPES: NodeType[] = [
   "repo",
-  "package",
-  "module",
-  "file",
-  "class",
-  "function",
-  "external_dep",
   "service",
   "entrypoint",
+  "external_dep",
 ];
 
 function GraphInner({ graph }: { graph: ProjectGraph }) {
-  const [activeTypes, setActiveTypes] = useState<Set<NodeType>>(new Set(ALL_TYPES));
+  const [activeTypes, setActiveTypes] = useState<Set<NodeType>>(new Set(SYSTEM_TYPES));
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const counts = useMemo(() => {

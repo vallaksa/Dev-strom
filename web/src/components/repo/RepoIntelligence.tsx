@@ -167,6 +167,7 @@ function SeveritySummary({ findings }: { findings: AnalysisFinding[] }) {
 
 function ArchitectureTab({ analysis }: { analysis: Analysis }) {
   const { repository: repo, graph, mermaid } = analysis;
+  const patterns = (graph?.stats?.architecture_patterns as string[] | undefined) ?? [];
   const byEcosystem = useMemo(() => {
     const map = new Map<string, Dependency[]>();
     for (const d of repo.dependencies) {
@@ -179,26 +180,37 @@ function ArchitectureTab({ analysis }: { analysis: Analysis }) {
 
   return (
     <div className="repo-intel__architecture">
-      {/* Curated component-level diagram (headline) with the interactive,
-          file/module-level structural graph beneath it — different altitudes,
-          both informative. Falls back gracefully when either is absent. */}
-      {mermaid ? (
+      {patterns.length > 0 && (
         <div className="card">
-          <span className="mono-label accent">Architecture Diagram</span>
-          <MermaidDiagram source={mermaid} />
+          <span className="mono-label accent">Architecture Patterns</span>
+          <div className="repo-intel__deps">
+            {patterns.map((p) => (
+              <span key={p} className="badge badge-accent">
+                {p}
+              </span>
+            ))}
+          </div>
         </div>
-      ) : graph ? (
-        <CartographGraph graph={graph} />
-      ) : (
-        <EmptyState message="No architecture diagram was produced for this run." />
       )}
 
-      {mermaid && graph && (
-        <div className="repo-intel__structural">
-          <span className="mono-label accent">Structural Graph</span>
-          <CartographGraph graph={graph} />
+      {mermaid && (
+        <div className="card">
+          <span className="mono-label accent">System Diagram</span>
+          <MermaidDiagram source={mermaid} />
         </div>
       )}
+
+      {graph ? (
+        <div className="repo-intel__structural">
+          <span className="mono-label accent">Service Map</span>
+          <p className="repo-intel__muted">
+            Services, integrations, and entrypoints — not individual classes or files.
+          </p>
+          <CartographGraph graph={graph} />
+        </div>
+      ) : !mermaid ? (
+        <EmptyState message="No architecture diagram was produced for this run." />
+      ) : null}
 
       <div className="card">
         <span className="mono-label accent">Entrypoints</span>
@@ -242,7 +254,7 @@ function DesignTab({ findings }: { findings: AnalysisFinding[] }) {
   }
   return (
     <div className="repo-intel__design">
-      <span className="mono-label accent">Findings &amp; Design Decisions</span>
+      <span className="mono-label accent">Architecture Patterns &amp; Findings</span>
       <div className="repo-intel__findings">
         {findings.map((f) => (
           <FindingCard key={f.id} finding={f} />

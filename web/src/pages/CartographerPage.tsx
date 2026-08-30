@@ -32,9 +32,8 @@ export function CartographerPage() {
       <SectionMarker index="II" label="Repository Intelligence" />
       <h1>Analyze a repository.</h1>
       <p className="cartographer-page__lede">
-        Paste a GitHub URL. Dev-Strom reconstructs the system, reasons about its architecture and
-        design decisions, and tells you where it could be better — you don't need to specify what to
-        analyze.
+        Paste a GitHub URL. Dev-Strom maps services and architecture patterns at the
+        distributed-systems level — not every class and function.
       </p>
 
       <form className="card cartographer-form" onSubmit={handleSubmit}>
