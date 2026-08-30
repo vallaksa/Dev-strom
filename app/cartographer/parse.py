@@ -283,7 +283,14 @@ def _resolve_dotted(g: _GraphBuilder, dotted: str) -> str | None:
     return None
 
 
-def _parse_python_file(g: _GraphBuilder, abs_path: Path, module_id: str, rel_path: Path) -> None:
+def _parse_python_file(
+    g: _GraphBuilder,
+    abs_path: Path,
+    module_id: str,
+    rel_path: Path,
+    *,
+    include_members: bool = False,
+) -> None:
     try:
         source = abs_path.read_text(encoding="utf-8", errors="ignore")
         tree = ast.parse(source, filename=str(rel_path))
@@ -332,12 +339,18 @@ def _parse_python_file(g: _GraphBuilder, abs_path: Path, module_id: str, rel_pat
                     _emit_import_edge(g, module_id, target)
 
         elif isinstance(stmt, ast.ClassDef):
+            if not include_members:
+                continue
             class_id = f"class:{_posix(rel_path)}:{stmt.name}"
             g.add_node(Node(id=class_id, type="class", label=stmt.name, path=_posix(rel_path)))
             g.add_edge(module_id, class_id, "contains")
             member_count += 1
 
         elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if not include_members:
+                if stmt.name == "main":
+                    has_main_func = True
+                continue
             func_id = f"function:{_posix(rel_path)}:{stmt.name}"
             g.add_node(Node(id=func_id, type="function", label=stmt.name, path=_posix(rel_path)))
             g.add_edge(module_id, func_id, "contains")
@@ -536,14 +549,16 @@ def _parse_manifests(g: _GraphBuilder, repo_id: str) -> dict:
 # ── entry point ──────────────────────────────────────────────────────────────
 
 
-def build_project_graph(root_path: str, repo_url: str | None = None) -> ProjectGraph:
+def build_project_graph(
+    root_path: str,
+    repo_url: str | None = None,
+    *,
+    include_members: bool = False,
+) -> ProjectGraph:
     """Walk `root_path` and build a normalized ProjectGraph.
 
-    Args:
-        root_path: local directory to parse (already cloned/resolved -
-            see app.cartographer.ingest.resolve_source).
-        repo_url: original source URL, if any (recorded on the graph but
-            not used for parsing).
+    By default skips class/function nodes (`include_members=False`) — the
+    pipeline rolls the graph up to system level via `aggregate.to_system_graph`.
     """
     root = Path(root_path).resolve()
     if not root.is_dir():
@@ -557,7 +572,7 @@ def build_project_graph(root_path: str, repo_url: str | None = None) -> ProjectG
 
     for abs_path, module_id in py_files:
         rel_path = abs_path.relative_to(root)
-        _parse_python_file(g, abs_path, module_id, rel_path)
+        _parse_python_file(g, abs_path, module_id, rel_path, include_members=include_members)
 
     manifests = _parse_manifests(g, repo_id)
 

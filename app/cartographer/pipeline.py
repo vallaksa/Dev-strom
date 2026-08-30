@@ -16,6 +16,7 @@ the evidence-first Analysis from that single ProjectGraph.
 import logging
 from pathlib import Path
 
+from app.cartographer.aggregate import to_system_graph
 from app.cartographer.findings import analyze_findings
 from app.cartographer.ingest import (
     _git_commit_sha,
@@ -58,6 +59,7 @@ def cartograph(url_or_path: str, repo_url: str | None = None, depth: int = 1) ->
 
     try:
         graph = build_project_graph(root_path, repo_url=repo_url or (None if was_local_dir else url_or_path))
+        graph = to_system_graph(graph)
     finally:
         if not was_local_dir:
             cleanup_clone(root_path)
@@ -79,6 +81,7 @@ def _ingest_and_analyze(
     try:
         commit_sha = _git_commit_sha(root_path)
         graph = build_project_graph(root_path, repo_url=provenance)
+        graph = to_system_graph(graph)
     finally:
         if not was_local_dir:
             cleanup_clone(root_path)
