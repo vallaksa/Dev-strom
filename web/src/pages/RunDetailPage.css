@@ -1,5 +1,5 @@
 .run-detail-page__back {
-  display: inline-block;
+  display: block;
   margin-bottom: var(--space-4);
   color: var(--ink-3);
   text-decoration: none;

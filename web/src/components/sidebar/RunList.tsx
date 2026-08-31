@@ -93,22 +93,6 @@ export function RunList() {
 
   return (
     <div className="run-list">
-      {ideas.length > 0 && (
-        <section className="run-list__group">
-          <p className="run-list__heading mono-label">Ideas</p>
-          {ideas.map((run) => (
-            <RunRow
-              key={run.run_id}
-              to={`/history/${run.run_id}`}
-              active={run.run_id === activeIdea}
-              glyph={<IdeaGlyph />}
-              title={run.tech_stack || run.run_id}
-              meta={relativeTime(run.created_at)}
-            />
-          ))}
-        </section>
-      )}
-
       {analyses.length > 0 && (
         <section className="run-list__group">
           <p className="run-list__heading mono-label">Repo Analyses</p>
@@ -124,6 +108,22 @@ export function RunList() {
                   ? `failed · ${relativeTime(a.created_at)}`
                   : `${a.finding_count} findings · ${relativeTime(a.created_at)}`
               }
+            />
+          ))}
+        </section>
+      )}
+
+      {ideas.length > 0 && (
+        <section className="run-list__group">
+          <p className="run-list__heading mono-label">Ideas</p>
+          {ideas.map((run) => (
+            <RunRow
+              key={run.run_id}
+              to={`/history/${run.run_id}`}
+              active={run.run_id === activeIdea}
+              glyph={<IdeaGlyph />}
+              title={run.tech_stack || run.run_id}
+              meta={relativeTime(run.created_at)}
             />
           ))}
         </section>

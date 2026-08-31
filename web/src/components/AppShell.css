@@ -1,19 +1,21 @@
 .app-shell {
   --sidebar-w: 264px;
-  --sidebar-rail-w: 0px;
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 }
 
-.app-shell.is-sidebar-collapsed {
-  grid-template-columns: var(--sidebar-rail-w) minmax(0, 1fr);
-}
-
+/* The sidebar is position:fixed (see Sidebar.css); the body just leaves a
+   gutter for it and closes the gutter when it collapses or on mobile. */
 .app-shell__body {
   min-width: 0;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  margin-left: var(--sidebar-w);
+  transition: margin-left 200ms ease;
+}
+
+.app-shell.is-sidebar-collapsed .app-shell__body {
+  margin-left: 0;
 }
 
 /* ── slim top bar ─────────────────────────────────────────────────────── */
@@ -84,10 +86,8 @@
   padding: var(--space-6);
 }
 
-/* ── responsive: sidebar overlays instead of taking a column ──────────── */
 @media (max-width: 900px) {
-  .app-shell,
-  .app-shell.is-sidebar-collapsed {
-    grid-template-columns: minmax(0, 1fr);
+  .app-shell__body {
+    margin-left: 0;
   }
 }
