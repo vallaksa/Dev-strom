@@ -87,13 +87,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               className="theme-toggle"
+              data-state={isDark ? "dark" : "light"}
               onClick={toggleTheme}
               role="switch"
               aria-checked={isDark}
               aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
               title={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {isDark ? <MoonIcon /> : <SunIcon />}
+              <span className="theme-toggle__thumb">
+                {isDark ? <MoonIcon /> : <SunIcon />}
+              </span>
             </button>
           </div>
         </div>
