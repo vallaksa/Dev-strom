@@ -5,7 +5,6 @@ import { LoadingState } from "./components/StateBlocks";
 
 const IdeasPage = lazy(() => import("./pages/IdeasPage").then((m) => ({ default: m.IdeasPage })));
 const AdvisorPage = lazy(() => import("./pages/AdvisorPage").then((m) => ({ default: m.AdvisorPage })));
-const HistoryPage = lazy(() => import("./pages/HistoryPage").then((m) => ({ default: m.HistoryPage })));
 const RunDetailPage = lazy(() =>
   import("./pages/RunDetailPage").then((m) => ({ default: m.RunDetailPage })),
 );
@@ -14,18 +13,22 @@ const AnalysisDetailPage = lazy(() =>
 );
 
 function isKnownPath(pathname: string): boolean {
-  if (pathname === "/" || pathname === "/advisor" || pathname === "/history") {
+  if (pathname === "/" || pathname === "/advisor") {
     return true;
   }
   return /^\/history\/[^/]+$/.test(pathname) || /^\/analysis\/[^/]+$/.test(pathname);
 }
 
-/** Keep main tabs mounted (hidden when inactive) so async work survives navigation. */
+/** Keep the two main tabs mounted (hidden when inactive) so async work survives navigation. */
 function TabbedRoutes() {
   const { pathname } = useLocation();
 
   if (pathname === "/cartographer") {
     return <Navigate to="/advisor" replace />;
+  }
+
+  if (pathname === "/history") {
+    return <Navigate to="/" replace />;
   }
 
   if (!isKnownPath(pathname)) {
@@ -34,7 +37,6 @@ function TabbedRoutes() {
 
   const showIdeas = pathname === "/";
   const showAdvisor = pathname === "/advisor";
-  const showHistory = pathname === "/history";
 
   return (
     <>
@@ -43,9 +45,6 @@ function TabbedRoutes() {
       </div>
       <div className="tab-panel" hidden={!showAdvisor} aria-hidden={!showAdvisor}>
         <AdvisorPage />
-      </div>
-      <div className="tab-panel" hidden={!showHistory} aria-hidden={!showHistory}>
-        <HistoryPage />
       </div>
 
       <Routes>

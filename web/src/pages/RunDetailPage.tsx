@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { getRun } from "../api/history";
 import { IdeaCard } from "../components/IdeaCard";
 import { SectionMarker } from "../components/SectionMarker";
@@ -8,13 +8,18 @@ import "./RunDetailPage.css";
 
 export function RunDetailPage() {
   const { runId = "" } = useParams();
+  const navigate = useNavigate();
   const state = useAsyncData(() => getRun(runId), [runId]);
 
   return (
     <div className="run-detail-page">
-      <Link to="/history" className="run-detail-page__back mono-label">
-        &larr; Back to History
-      </Link>
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="run-detail-page__back mono-label"
+      >
+        &larr; Back
+      </button>
       <SectionMarker label="Run Detail" />
       <h1 className="run-detail-page__title">
         {state.status === "success" ? state.data.tech_stack : runId}

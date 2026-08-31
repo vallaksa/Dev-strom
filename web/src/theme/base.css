@@ -29,7 +29,8 @@ body {
    layout or defeat reduced-motion preferences. */
 @media (prefers-reduced-motion: no-preference) {
   body,
-  .app-shell__header,
+  .app-shell__topbar,
+  .sidebar,
   .card,
   .input,
   .badge,

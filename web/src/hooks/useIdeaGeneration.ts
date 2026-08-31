@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { postIdeas } from "../api/ideas";
 import { ApiError } from "../api/client";
+import { notifyRunsChanged } from "../lib/runsStore";
 import type { Idea, IdeasRequest, IdeasResponse } from "../api/types";
 
 export interface IdeaBatch {
@@ -73,6 +74,7 @@ export async function generateIdeas(
       const batch = appendBatch(data);
       state = { status: "success", batches: append ? [...priorBatches, batch] : [batch] };
       emit();
+      notifyRunsChanged();
     }
     return data;
   } catch (err) {
