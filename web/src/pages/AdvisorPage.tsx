@@ -70,8 +70,8 @@ export function AdvisorPage() {
       <SectionMarker index="II" label="Repository Intelligence" />
       <h1>Analyze a repository.</h1>
       <p className="repo-intel-page__lede">
-        Paste a GitHub URL or local path. Dev-Strom maps services and architecture
-        patterns at the distributed-systems level — not every class and function.
+        Paste a GitHub URL or local path. Get the system-level map — services,
+        dependencies, and evidence-backed findings with a live architecture graph.
       </p>
 
       <form className="card repo-intel-form" onSubmit={handleSubmit}>
