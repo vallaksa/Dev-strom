@@ -15,7 +15,7 @@ export function RunDetailPage() {
       <Link to="/history" className="run-detail-page__back mono-label">
         &larr; Back to History
       </Link>
-      <SectionMarker index="IV" label="Run Detail" />
+      <SectionMarker label="Run Detail" />
       <h1 className="run-detail-page__title">
         {state.status === "success" ? state.data.tech_stack : runId}
       </h1>

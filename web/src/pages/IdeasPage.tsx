@@ -54,7 +54,7 @@ export function IdeasPage() {
 
   return (
     <div className="ideas-page">
-      <SectionMarker index="I" label="Generate Ideas" />
+      <SectionMarker label="Generate Ideas" />
       <h1>What do you want to build?</h1>
       <p className="ideas-page__lede">
         Describe what you're after in plain language — a stack, a domain, the kind of challenge
@@ -144,7 +144,7 @@ export function IdeasPage() {
         {state.status === "success" && (
           <>
             <hr className="hr" />
-            <SectionMarker index="II" label={`${totalIdeas} Ideas`} />
+            <SectionMarker label={`${totalIdeas} Ideas`} />
             {state.batches.map((batch) => (
               <section key={batch.batchId} className="ideas-batch">
                 <p className="ideas-batch__label mono-label">{batch.label}</p>

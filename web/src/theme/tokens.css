@@ -1,42 +1,60 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   Dev-Strom design tokens — "warm editorial paper" theme, in the spirit of
-   october.dev. Every color/spacing/type decision in the app should resolve
+   Dev-Strom design tokens — "warm editorial paper" theme with a first-class
+   dark mode. Every color/spacing/type decision in the app should resolve
    through a custom property defined here. Do not hardcode hex values in
    component CSS — add or reuse a token instead.
+
+   Theming model:
+     • :root                              → light palette (default)
+     • @media (prefers-color-scheme:dark) → dark palette when the OS asks
+       + :root:not([data-theme="light"])    for it and the user has not
+                                             pinned light
+     • :root[data-theme="dark"]           → dark palette when the user
+                                             pins dark via the header toggle
    ───────────────────────────────────────────────────────────────────────── */
 
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 
 :root {
+  color-scheme: light;
+
   /* ── paper / surfaces ─────────────────────────────────────────────── */
-  --bg: #f3f0e8;
-  --surface: #faf8f3;
-  --surface-2: #e9e4d9;
-  --border: #bfb5a2;
-  --border-soft: #dcd4c5;
+  --bg: #f4f1e9;
+  --surface: #fbf9f4;
+  --surface-2: #ebe6da;
+  --surface-3: #e2dccd;
+  --border: #c6bca7;
+  --border-soft: #ddd5c4;
 
   /* ── ink (text on paper) ──────────────────────────────────────────── */
-  --ink: #181511;
-  --ink-2: #554e45;
-  --ink-3: #746c61;
+  --ink: #17130d;
+  --ink-2: #4e463b;
+  --ink-3: #786f61;
 
   /* ── accent (October rust) ────────────────────────────────────────── */
-  --accent: #b8460d;
-  --accent-soft: #f3a271;
+  --accent: #bd4a12;
+  --accent-hover: #a03c0c;
+  --accent-soft: #f0a173;
+  --accent-wash: #f7e6d8;
   --accent-ink: #fff9f2; /* text on top of solid accent */
 
-  /* ── dark canvas / code surfaces ──────────────────────────────────── */
-  --canvas: #18171c;
-  --canvas-2: #111014;
-  --on-dark: #fffaf3;
+  /* ── dark canvas / code surfaces (always dark, both themes) ───────── */
+  --canvas: #1b1a1f;
+  --canvas-2: #131217;
+  --on-dark: #fdf8f0;
   --on-dark-2: #b8b2a6;
-  --canvas-border: #35333a;
+  --canvas-border: #37343c;
 
   /* ── semantic status (kept warm, not saturated primary colors) ────── */
   --ok: #4c7a3f;
   --warn: #b8460d;
   --danger: #a5291d;
   --info: #3f6b7a;
+
+  /* severity fills (badges, meters) */
+  --sev-high: #c0491b;
+  --sev-medium: #a3721f;
+  --on-status: #fff9f2;
 
   /* ── type ──────────────────────────────────────────────────────────── */
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -83,4 +101,89 @@
   --edge-depends_on: #d9a441;
   --edge-exposes: #b8460d;
   --edge-reads_writes: #c17ac2;
+}
+
+/* ── dark palette ─────────────────────────────────────────────────────────
+   Only the tokens that change between themes are redefined below. Keep this
+   list in sync between the two selectors. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #151317;
+    --surface: #1d1b20;
+    --surface-2: #262329;
+    --surface-3: #302c33;
+    --border: #423e47;
+    --border-soft: #322f37;
+
+    --ink: #f2ede4;
+    --ink-2: #c3bcae;
+    --ink-3: #928a7c;
+
+    --accent: #e0703a;
+    --accent-hover: #ee7f48;
+    --accent-soft: #7c4526;
+    --accent-wash: #2c211b;
+    --accent-ink: #1a1209;
+
+    --canvas: #100f13;
+    --canvas-2: #0b0a0e;
+    --on-dark: #f2ede4;
+    --on-dark-2: #a49c8e;
+    --canvas-border: #34313a;
+
+    --ok: #6fae7f;
+    --warn: #e0703a;
+    --danger: #e0685a;
+    --info: #6fa5b6;
+
+    --sev-high: #d4643a;
+    --sev-medium: #c99a4a;
+    --on-status: #1a1209;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #151317;
+  --surface: #1d1b20;
+  --surface-2: #262329;
+  --surface-3: #302c33;
+  --border: #423e47;
+  --border-soft: #322f37;
+
+  --ink: #f2ede4;
+  --ink-2: #c3bcae;
+  --ink-3: #928a7c;
+
+  --accent: #e0703a;
+  --accent-hover: #ee7f48;
+  --accent-soft: #7c4526;
+  --accent-wash: #2c211b;
+  --accent-ink: #1a1209;
+
+  --canvas: #100f13;
+  --canvas-2: #0b0a0e;
+  --on-dark: #f2ede4;
+  --on-dark-2: #a49c8e;
+  --canvas-border: #34313a;
+
+  --ok: #6fae7f;
+  --warn: #e0703a;
+  --danger: #e0685a;
+  --info: #6fa5b6;
+
+  --sev-high: #d4643a;
+  --sev-medium: #c99a4a;
+  --on-status: #1a1209;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
 }

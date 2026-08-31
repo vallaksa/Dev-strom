@@ -1,8 +1,4 @@
-/** October-style numbered/roman-numeral section marker, e.g. "I. Overview". */
-export function SectionMarker({ index, label }: { index: string; label: string }) {
-  return (
-    <div className="section-marker" data-index={index}>
-      {label}
-    </div>
-  );
+/** Small uppercase eyebrow that labels a section, e.g. "Repository Intelligence". */
+export function SectionMarker({ label }: { label: string }) {
+  return <div className="section-marker">{label}</div>;
 }

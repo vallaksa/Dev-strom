@@ -30,7 +30,7 @@ export function HistoryPage() {
 
   return (
     <div className="history-page">
-      <SectionMarker index="IV" label="Run History" />
+      <SectionMarker label="Run History" />
       <h1>Past runs.</h1>
       <p className="history-page__lede">
         Every idea-generation and repository-analysis run, most recent first.

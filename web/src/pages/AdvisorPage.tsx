@@ -67,7 +67,7 @@ export function AdvisorPage() {
 
   return (
     <div className="repo-intel-page">
-      <SectionMarker index="II" label="Repository Intelligence" />
+      <SectionMarker label="Repository Intelligence" />
       <h1>Analyze a repository.</h1>
       <p className="repo-intel-page__lede">
         Paste a GitHub URL or local path. Get the system-level map — services,

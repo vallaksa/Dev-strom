@@ -146,21 +146,21 @@
 }
 
 .repo-intel__sev--critical {
-  color: #fff;
+  color: var(--on-status);
   background: var(--danger);
   border-color: var(--danger);
 }
 
 .repo-intel__sev--high {
-  color: #fff;
-  background: #c0491b;
-  border-color: #c0491b;
+  color: var(--on-status);
+  background: var(--sev-high);
+  border-color: var(--sev-high);
 }
 
 .repo-intel__sev--medium {
-  color: #fff;
-  background: #a3721f;
-  border-color: #a3721f;
+  color: var(--on-status);
+  background: var(--sev-medium);
+  border-color: var(--sev-medium);
 }
 
 .repo-intel__sev--low {
@@ -258,7 +258,7 @@
 }
 
 .repo-intel__meter-fill--med {
-  background: #a3721f;
+  background: var(--sev-medium);
 }
 
 .repo-intel__meter-fill--low {

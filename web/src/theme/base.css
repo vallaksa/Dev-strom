@@ -22,6 +22,21 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* Smooth the palette swap when the theme toggle flips, but never animate
+   layout or defeat reduced-motion preferences. */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  .app-shell__header,
+  .card,
+  .input,
+  .badge,
+  .btn {
+    transition: background-color 200ms ease, color 200ms ease,
+      border-color 200ms ease;
+  }
 }
 
 h1,
@@ -81,22 +96,26 @@ button {
   color: var(--accent);
 }
 
-/* ── roman-numeral / numbered section marker motif ────────────────────── */
+/* ── section eyebrow motif ───────────────────────────────────────────── */
 .section-marker {
-  display: flex;
-  align-items: baseline;
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-2);
   font-family: var(--font-mono);
   color: var(--accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .section-marker::before {
-  content: attr(data-index) ".";
-  color: var(--ink-3);
+  content: "";
+  width: 18px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
 }
 
 /* ── hairline rule ─────────────────────────────────────────────────────── */
@@ -143,8 +162,8 @@ button {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #9c3b0b;
-  border-color: #9c3b0b;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn-secondary {
@@ -256,15 +275,15 @@ textarea.input {
 
 /* ── impact / effort badges ───────────────────────────────────────────── */
 .badge-high {
-  color: #fff;
+  color: var(--on-status);
   background: var(--danger);
   border-color: var(--danger);
 }
 
 .badge-medium {
-  color: #fff;
-  background: #a3721f;
-  border-color: #a3721f;
+  color: var(--on-status);
+  background: var(--sev-medium);
+  border-color: var(--sev-medium);
 }
 
 .badge-low {

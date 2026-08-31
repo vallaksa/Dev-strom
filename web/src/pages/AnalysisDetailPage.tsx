@@ -15,7 +15,7 @@ export function AnalysisDetailPage() {
       <Link to="/history" className="run-detail-page__back mono-label">
         &larr; Back to History
       </Link>
-      <SectionMarker index="II" label="Repository Intelligence" />
+      <SectionMarker label="Repository Intelligence" />
 
       {state.status === "loading" && <LoadingState label="Loading analysis" />}
       {state.status === "error" && <ErrorState message={state.error} onRetry={state.reload} />}
