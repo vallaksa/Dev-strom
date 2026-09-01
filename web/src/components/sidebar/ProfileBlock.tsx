@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useDemoMode } from "../../hooks/useDemoMode";
-import { AuthModal } from "./AuthModal";
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -14,7 +13,6 @@ export function ProfileBlock({ collapsed }: { collapsed: boolean }) {
   const { user, signOut } = useAuth();
   const { demoMode, forced, setDemoMode } = useDemoMode();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,8 +31,9 @@ export function ProfileBlock({ collapsed }: { collapsed: boolean }) {
     };
   }, [menuOpen]);
 
-  const label = user ? user.name : "Guest";
-  const sublabel = user ? user.email : "Not signed in";
+  // App routes are gated by RequireAuth, so `user` is always set here.
+  const name = user?.name || user?.email || "Account";
+  const email = user?.email ?? "";
 
   return (
     <div className="profile-block" ref={wrapRef}>
@@ -44,27 +43,27 @@ export function ProfileBlock({ collapsed }: { collapsed: boolean }) {
         onClick={() => setMenuOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
-        title={user ? `${label} · ${sublabel}` : "Account & settings"}
+        title={`${name} · ${email}`}
       >
-        <span className={"profile-block__avatar" + (user ? "" : " is-guest")}>
-          {user ? initials(user.name) : "?"}
-        </span>
+        {user?.avatar_url ? (
+          <img className="profile-block__avatar" src={user.avatar_url} alt="" width="30" height="30" />
+        ) : (
+          <span className="profile-block__avatar">{initials(name)}</span>
+        )}
         {!collapsed && (
           <span className="profile-block__id">
-            <span className="profile-block__name">{label}</span>
-            <span className="profile-block__sub">{sublabel}</span>
+            <span className="profile-block__name">{name}</span>
+            <span className="profile-block__sub">{email}</span>
           </span>
         )}
       </button>
 
       {menuOpen && (
         <div className="profile-menu" role="menu">
-          {user && (
-            <div className="profile-menu__header">
-              <span className="profile-block__name">{user.name}</span>
-              <span className="profile-block__sub">{user.email}</span>
-            </div>
-          )}
+          <div className="profile-menu__header">
+            <span className="profile-block__name">{name}</span>
+            <span className="profile-block__sub">{email}</span>
+          </div>
 
           <button
             type="button"
@@ -83,35 +82,19 @@ export function ProfileBlock({ collapsed }: { collapsed: boolean }) {
 
           <div className="profile-menu__divider" />
 
-          {user ? (
-            <button
-              type="button"
-              className="profile-menu__row"
-              role="menuitem"
-              onClick={() => {
-                signOut();
-                setMenuOpen(false);
-              }}
-            >
-              <span>Sign out</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="profile-menu__row"
-              role="menuitem"
-              onClick={() => {
-                setMenuOpen(false);
-                setAuthOpen(true);
-              }}
-            >
-              <span>Sign in</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className="profile-menu__row"
+            role="menuitem"
+            onClick={() => {
+              setMenuOpen(false);
+              void signOut();
+            }}
+          >
+            <span>Sign out</span>
+          </button>
         </div>
       )}
-
-      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </div>
   );
 }

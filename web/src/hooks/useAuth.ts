@@ -1,12 +1,22 @@
 import { useSyncExternalStore } from "react";
-import { getUser, signIn, signOut, subscribeAuth, type AuthUser } from "../lib/auth";
+import {
+  getAuthState,
+  getProviders,
+  signIn,
+  signOut,
+  subscribeAuth,
+  type AuthState,
+  type AuthUser,
+} from "../lib/auth";
 
-/** React binding for the client-side auth seam (see lib/auth.ts). */
+/** React binding for the session-backed auth state (see lib/auth.ts). */
 export function useAuth(): {
+  status: AuthState["status"];
   user: AuthUser | null;
-  signIn: (email: string) => Promise<AuthUser>;
-  signOut: () => void;
+  signIn: (provider: string, next?: string) => void;
+  signOut: () => Promise<void>;
+  getProviders: () => Promise<string[]>;
 } {
-  const user = useSyncExternalStore(subscribeAuth, getUser, getUser);
-  return { user, signIn, signOut };
+  const s = useSyncExternalStore(subscribeAuth, getAuthState, getAuthState);
+  return { status: s.status, user: s.user, signIn, signOut, getProviders };
 }

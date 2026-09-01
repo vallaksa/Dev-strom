@@ -1,90 +1,81 @@
 /**
- * Client-side auth seam.
+ * Auth state, backed by the server session cookie.
  *
- * The Dev-Strom backend has no auth yet — every request runs as
- * ANONYMOUS_USER_ID. This module is the single place a real flow plugs in:
- * replace the bodies of `signIn` / `signOut` / `restore` with calls to the
- * eventual `/auth/*` endpoints and the rest of the UI keeps working.
- *
- * Until then it keeps a mock session in localStorage so the profile UI is
- * fully exercisable.
+ * On load the app calls `refreshAuth()` once, which hits `GET /api/auth/me`.
+ * Sign-in is a full-page redirect to the provider; the server sets the
+ * `ds_session` cookie and bounces back. Sign-out clears it server-side.
  */
 
 export interface AuthUser {
   id: string;
-  name: string;
   email: string;
+  name: string | null;
+  avatar_url: string | null;
+  auth_provider: string;
 }
 
-const STORAGE_KEY = "devstrom.auth";
+export type AuthState =
+  | { status: "loading"; user: null }
+  | { status: "authenticated"; user: AuthUser }
+  | { status: "anonymous"; user: null };
 
-type Listener = () => void;
-const listeners = new Set<Listener>();
+let state: AuthState = { status: "loading", user: null };
+const listeners = new Set<() => void>();
+const emit = () => listeners.forEach((l) => l());
 
-function readStored(): AuthUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<AuthUser>;
-    if (parsed && parsed.id && parsed.email && parsed.name) {
-      return parsed as AuthUser;
-    }
-  } catch {
-    // ignore malformed / unavailable storage
-  }
-  return null;
+export function getAuthState(): AuthState {
+  return state;
 }
 
-let currentUser: AuthUser | null = readStored();
-
-export function getUser(): AuthUser | null {
-  return currentUser;
-}
-
-function persist(user: AuthUser | null): void {
-  try {
-    if (user) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    else window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // ignore (private browsing / storage disabled)
-  }
-}
-
-function nameFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? email;
-  return local
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ") || email;
-}
-
-/**
- * TODO(auth): replace with `POST /auth/session { email }` (magic-link or
- * password) and hydrate `currentUser` from the response.
- */
-export async function signIn(email: string): Promise<AuthUser> {
-  const trimmed = email.trim();
-  const user: AuthUser = {
-    id: `local:${trimmed.toLowerCase()}`,
-    name: nameFromEmail(trimmed),
-    email: trimmed,
-  };
-  currentUser = user;
-  persist(user);
-  listeners.forEach((l) => l());
-  return user;
-}
-
-/** TODO(auth): replace with `DELETE /auth/session`. */
-export function signOut(): void {
-  currentUser = null;
-  persist(null);
-  listeners.forEach((l) => l());
-}
-
-export function subscribeAuth(listener: Listener): () => void {
+export function subscribeAuth(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+let inflight: Promise<void> | null = null;
+
+/** Fetch the current session. Idempotent — concurrent callers share one request. */
+export function refreshAuth(): Promise<void> {
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      const res = await fetch("/api/auth/me", { credentials: "include" });
+      if (res.ok) {
+        state = { status: "authenticated", user: (await res.json()) as AuthUser };
+      } else {
+        state = { status: "anonymous", user: null };
+      }
+    } catch {
+      state = { status: "anonymous", user: null };
+    } finally {
+      emit();
+      inflight = null;
+    }
+  })();
+  return inflight;
+}
+
+/** Providers the server has credentials for — the login page renders one button each. */
+export async function getProviders(): Promise<string[]> {
+  try {
+    const res = await fetch("/api/auth/providers", { credentials: "include" });
+    if (!res.ok) return [];
+    return ((await res.json()) as { providers: string[] }).providers ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function signIn(provider: string, next?: string): void {
+  const q = next ? `?next=${encodeURIComponent(next)}` : "";
+  window.location.href = `/api/auth/${provider}/login${q}`;
+}
+
+export async function signOut(): Promise<void> {
+  try {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+  } catch {
+    /* ignore — cookie may already be gone */
+  }
+  window.location.href = "/";
 }

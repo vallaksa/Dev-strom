@@ -216,16 +216,12 @@
   height: 30px;
   flex-shrink: 0;
   border-radius: 50%;
+  object-fit: cover;
   background: var(--accent);
   color: var(--accent-ink);
   font-family: var(--font-mono);
   font-size: 0.66rem;
   font-weight: 700;
-}
-
-.profile-block__avatar.is-guest {
-  background: var(--surface-3);
-  color: var(--ink-3);
 }
 
 .profile-block__id {
