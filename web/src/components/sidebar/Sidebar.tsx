@@ -7,7 +7,7 @@ import { RunList } from "./RunList";
 import "./Sidebar.css";
 
 const NEW_ACTIONS = [
-  { to: "/", label: "New Ideas", end: true },
+  { to: "/ideas", label: "New Ideas", end: true },
   { to: "/advisor", label: "New Analysis", end: false },
 ];
 
@@ -66,7 +66,7 @@ export function Sidebar() {
                 <PlusIcon />
               </span>
               <span className="sidebar__action-label">
-                {action.to === "/" && generating ? "Generating…" : action.label}
+                {action.to === "/ideas" && generating ? "Generating…" : action.label}
               </span>
             </NavLink>
           ))}

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { IdeaCard } from "../components/IdeaCard";
 import { SectionMarker } from "../components/SectionMarker";
 import { ErrorState, LoadingState } from "../components/StateBlocks";
@@ -13,7 +14,8 @@ const EXAMPLES = [
 ];
 
 export function IdeasPage() {
-  const [intent, setIntent] = useState("");
+  const [searchParams] = useSearchParams();
+  const [intent, setIntent] = useState(() => searchParams.get("intent") ?? "");
   const [refinementContext, setRefinementContext] = useState("");
   const [showRefinement, setShowRefinement] = useState(false);
 
