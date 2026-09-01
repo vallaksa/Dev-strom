@@ -13,7 +13,7 @@
                                              pins dark via the header toggle
    ───────────────────────────────────────────────────────────────────────── */
 
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 
 :root {
   color-scheme: light;
@@ -31,12 +31,16 @@
   --ink-2: #4e463b;
   --ink-3: #786f61;
 
-  /* ── accent (October rust) ────────────────────────────────────────── */
-  --accent: #bd4a12;
-  --accent-hover: #a03c0c;
+  /* ── accent (brand Copper — keep it rare, one CTA per screen) ──────── */
+  --accent: #e2703a;
+  --accent-hover: #c85b28;
   --accent-soft: #f0a173;
-  --accent-wash: #f7e6d8;
+  --accent-wash: #f8e8dd;
   --accent-ink: #fff9f2; /* text on top of solid accent */
+
+  /* ── brand steel + bone (secondary text, metadata, code) ──────────── */
+  --steel: #9bb0c1;
+  --bone: #f5efe8;
 
   /* ── dark canvas / code surfaces (always dark, both themes) ───────── */
   --canvas: #1b1a1f;
@@ -56,9 +60,9 @@
   --sev-medium: #a3721f;
   --on-status: #fff9f2;
 
-  /* ── type ──────────────────────────────────────────────────────────── */
+  /* ── type (brand: Space Grotesk for display + wordmark) ───────────── */
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-display: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
 
   /* ── spacing scale ─────────────────────────────────────────────────── */
@@ -110,28 +114,29 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --bg: #151317;
-    --surface: #1d1b20;
-    --surface-2: #262329;
-    --surface-3: #302c33;
-    --border: #423e47;
-    --border-soft: #322f37;
+    /* brand Ink base, Umber raised surfaces + borders, Bone text */
+    --bg: #1a1512;
+    --surface: #241d18;
+    --surface-2: #2f2620;
+    --surface-3: #3a2f27;
+    --border: #4a3b31;
+    --border-soft: #382d25;
 
-    --ink: #f2ede4;
-    --ink-2: #c3bcae;
-    --ink-3: #928a7c;
+    --ink: #f5efe8;
+    --ink-2: #cabdb0;
+    --ink-3: #9b8e7f;
 
-    --accent: #e0703a;
-    --accent-hover: #ee7f48;
+    --accent: #e2703a;
+    --accent-hover: #ef8552;
     --accent-soft: #7c4526;
-    --accent-wash: #2c211b;
+    --accent-wash: #33231a;
     --accent-ink: #1a1209;
 
-    --canvas: #100f13;
-    --canvas-2: #0b0a0e;
-    --on-dark: #f2ede4;
-    --on-dark-2: #a49c8e;
-    --canvas-border: #34313a;
+    --canvas: #12100e;
+    --canvas-2: #0c0a09;
+    --on-dark: #f5efe8;
+    --on-dark-2: #9bb0c1;
+    --canvas-border: #3a2f27;
 
     --ok: #6fae7f;
     --warn: #e0703a;
@@ -151,28 +156,29 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #151317;
-  --surface: #1d1b20;
-  --surface-2: #262329;
-  --surface-3: #302c33;
-  --border: #423e47;
-  --border-soft: #322f37;
+  /* brand Ink base, Umber raised surfaces + borders, Bone text */
+  --bg: #1a1512;
+  --surface: #241d18;
+  --surface-2: #2f2620;
+  --surface-3: #3a2f27;
+  --border: #4a3b31;
+  --border-soft: #382d25;
 
-  --ink: #f2ede4;
-  --ink-2: #c3bcae;
-  --ink-3: #928a7c;
+  --ink: #f5efe8;
+  --ink-2: #cabdb0;
+  --ink-3: #9b8e7f;
 
-  --accent: #e0703a;
-  --accent-hover: #ee7f48;
+  --accent: #e2703a;
+  --accent-hover: #ef8552;
   --accent-soft: #7c4526;
-  --accent-wash: #2c211b;
+  --accent-wash: #33231a;
   --accent-ink: #1a1209;
 
-  --canvas: #100f13;
-  --canvas-2: #0b0a0e;
-  --on-dark: #f2ede4;
-  --on-dark-2: #a49c8e;
-  --canvas-border: #34313a;
+  --canvas: #12100e;
+  --canvas-2: #0c0a09;
+  --on-dark: #f5efe8;
+  --on-dark-2: #9bb0c1;
+  --canvas-border: #3a2f27;
 
   --ok: #6fae7f;
   --warn: #e0703a;

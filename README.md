@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="brand/banner.png" alt="Dev-Strom — You've learned the stack. Now build something with it." width="100%">
+</p>
+
 # Dev-Strom
 
 **Get concrete project ideas for any tech stack, and analyze repositories with evidence-backed findings.**

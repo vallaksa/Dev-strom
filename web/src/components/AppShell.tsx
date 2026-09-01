@@ -37,7 +37,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <NavLink to="/" className="app-shell__wordmark">
-          <span className="app-shell__wordmark-mark">DS</span>
+          <img
+            src="/logo-mark.svg"
+            alt=""
+            className="app-shell__wordmark-mark"
+            width="24"
+            height="24"
+          />
           <span className="app-shell__wordmark-text">Dev&#8209;Strom</span>
         </NavLink>
 
