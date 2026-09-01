@@ -34,23 +34,29 @@ export function subscribeAuth(listener: () => void): () => void {
 
 let inflight: Promise<void> | null = null;
 
-/** Fetch the current session. Idempotent — concurrent callers share one request. */
+/** Fetch the current session. Idempotent — concurrent callers share one request.
+ *  A transient network error retries once and, if still failing, leaves the
+ *  prior state alone rather than falsely signing the user out. Only an actual
+ *  HTTP response settles the state. */
 export function refreshAuth(): Promise<void> {
   if (inflight) return inflight;
   inflight = (async () => {
-    try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
-      if (res.ok) {
-        state = { status: "authenticated", user: (await res.json()) as AuthUser };
-      } else {
-        state = { status: "anonymous", user: null };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        state = res.ok
+          ? { status: "authenticated", user: (await res.json()) as AuthUser }
+          : { status: "anonymous", user: null };
+        break;
+      } catch {
+        if (attempt === 1 && state.status === "loading") {
+          state = { status: "anonymous", user: null };
+        }
+        await new Promise((r) => setTimeout(r, 400));
       }
-    } catch {
-      state = { status: "anonymous", user: null };
-    } finally {
-      emit();
-      inflight = null;
     }
+    emit();
+    inflight = null;
   })();
   return inflight;
 }
