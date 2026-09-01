@@ -95,8 +95,6 @@ Returns `run_id`, evidence-backed `findings`, `recommendations`, and a structura
 
 ### End-to-end flow (Ideas)
 
-![Dev-Strom architecture flow](docs/architecture.png)
-
 ```
 User input: intent or tech_stack
          │
@@ -187,9 +185,6 @@ services) and `web/` (React frontend). `migrations/` holds Alembic migrations.
 | `app/services/export_formatter.py` | Idea + extended plan → LLM-ready Markdown for download. |
 | `web/` | React + Vite frontend: Ideas, Repository Intelligence, History. See [web/README.md](web/README.md). |
 | `migrations/` | Alembic migration environment and versions (`001_initial_schema.py`, ...). |
-| `docs/PLAN.md` | Master architecture plan and roadmap. |
-| `docs/V3_TICKETS.md` | V3 Jira-style tickets. |
-| `docs/BACKLOG.md` | Deferred features (GraphRAG, auth, etc.). |
 
 ---
 
@@ -288,6 +283,6 @@ With `ENABLE_MCP=false`, idea generation behaves as before (no MCP tools).
 
 ---
 
-## License and docs
+## More
 
-- **Plan and tickets:** [docs/PLAN.md](docs/PLAN.md), [docs/V3_TICKETS.md](docs/V3_TICKETS.md), [docs/BACKLOG.md](docs/BACKLOG.md)
+- **Frontend:** [web/README.md](web/README.md)
