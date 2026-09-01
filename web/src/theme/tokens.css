@@ -82,10 +82,16 @@
   --radius-lg: 8px;
   --hairline: 1px;
 
-  /* ── shadow (very subtle, paper does not float much) ─────────────── */
-  --shadow-sm: 0 1px 2px rgba(24, 21, 17, 0.06);
-  --shadow-md: 0 4px 16px rgba(24, 21, 17, 0.1);
-  --shadow-lg: 0 12px 32px rgba(24, 21, 17, 0.16);
+  /* ── elevation ────────────────────────────────────────────────────── */
+  /* Raised surfaces get a faint top-lit gradient + a layered shadow so
+     panels read as physical cards. Resolves per-theme via the nested
+     surface vars. */
+  --surface-raised: linear-gradient(158deg, var(--surface-3) -12%, var(--surface) 58%);
+
+  --shadow-sm: 0 1px 2px rgba(26, 21, 18, 0.06), 0 1px 1px rgba(26, 21, 18, 0.04);
+  --shadow-md: 0 2px 4px rgba(26, 21, 18, 0.05), 0 10px 24px rgba(26, 21, 18, 0.1);
+  --shadow-lg: 0 4px 8px rgba(26, 21, 18, 0.06), 0 20px 48px rgba(26, 21, 18, 0.16);
+  --shadow-glow: 0 0 40px rgba(226, 112, 58, 0.13);
 
   /* ── node-type accent colors (Cartographer graph) ─────────────────── */
   --node-repo: #f3a271;
@@ -147,9 +153,9 @@
     --sev-medium: #c99a4a;
     --on-status: #1a1209;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.35), 0 24px 56px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -189,7 +195,7 @@
   --sev-medium: #c99a4a;
   --on-status: #1a1209;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.35), 0 24px 56px rgba(0, 0, 0, 0.55);
 }

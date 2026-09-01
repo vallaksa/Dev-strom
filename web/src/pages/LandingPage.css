@@ -102,12 +102,13 @@
   gap: var(--space-9);
 }
 
-/* glass surface reused by cards / mock / terminal */
+/* raised surface — same treatment as the app's .card */
 .landing-card,
 .landing-terminal,
 .landing-mock {
-  background: linear-gradient(145deg, var(--surface-3), var(--surface));
+  background: var(--surface-raised);
   border: var(--hairline) solid var(--border-soft);
+  box-shadow: var(--shadow-md);
 }
 
 /* ── hero ────────────────────────────────────────────────────────────── */
@@ -151,7 +152,7 @@
   border-radius: var(--radius-lg);
   display: flex;
   gap: var(--space-3);
-  box-shadow: 0 0 40px rgba(226, 112, 58, 0.14);
+  box-shadow: var(--shadow-md), var(--shadow-glow);
 }
 
 .landing-terminal__field {
@@ -213,6 +214,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 .landing-card__head {

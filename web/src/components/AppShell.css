@@ -18,7 +18,8 @@
   gap: var(--space-3);
   padding: 0 var(--space-4);
   background: var(--bg);
-  border-bottom: var(--hairline) solid var(--border);
+  border-bottom: var(--hairline) solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
 }
 
 .app-shell__topbar-left {

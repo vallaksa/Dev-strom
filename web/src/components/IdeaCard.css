@@ -1,6 +1,13 @@
 .idea-card {
   display: flex;
   flex-direction: column;
+  transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
+}
+
+.idea-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border);
 }
 
 .idea-card__head {
