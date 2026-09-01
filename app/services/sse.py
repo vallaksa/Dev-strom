@@ -46,6 +46,7 @@ async def job_event_stream(
     poll_interval: float = 1.0,
     heartbeat_interval: float = 15.0,
     clock=time.monotonic,
+    get_job_fn=None,
 ) -> AsyncIterator[str]:
     """Yield SSE frames for the lifecycle of job `job_id`.
 
@@ -59,10 +60,11 @@ async def job_event_stream(
     """
     last_status = None
     last_emit_time = clock()
+    get_job_fn = get_job_fn or get_job
 
     while True:
         try:
-            record = await asyncio.to_thread(get_job, job_id)
+            record = await asyncio.to_thread(get_job_fn, job_id)
         except Exception as exc:  # DB hiccup: one error event, then close.
             yield format_sse("error", {"error": f"Failed to read job: {exc}"})
             return
