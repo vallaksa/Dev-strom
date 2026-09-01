@@ -75,6 +75,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const apiClient = {
   get: <T>(path: string, query?: RequestOptions["query"]) => request<T>(path, { method: "GET", query }),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body }),
+  post: <T>(path: string, body?: unknown, options: Omit<RequestOptions, "method" | "body"> = {}) =>
+    request<T>(path, { method: "POST", body, ...options }),
   postText: (path: string, body?: unknown) => request<string>(path, { method: "POST", body }),
 };

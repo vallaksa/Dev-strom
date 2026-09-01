@@ -5,11 +5,12 @@ repository intelligence (POST /analyze). All runs are persisted to PostgreSQL.
 Until auth is implemented, all operations use the ANONYMOUS_USER_ID.
 """
 
+import asyncio
 import logging
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 from app.models.dto import (
     AnalyzeRequest,
@@ -17,6 +18,8 @@ from app.models.dto import (
     ExportRequest,
     IdeasRequest,
 )
+
+from app.services.models import ANONYMOUS_USER_ID
 
 load_dotenv()
 
@@ -54,11 +57,13 @@ except ImportError as exc:
 # ── Async Job Runner (F4) ────────────────────────────────────────────────────
 # Guard imports so app.api stays loadable if app.services.jobs is unavailable.
 try:
-    from app.services.jobs import create_job, get_job, run_job
+    from app.services.jobs import create_job, get_job, get_job_status, run_job
+    from app.services.sse import SSE_HEADERS, job_event_stream
 except ImportError as exc:
     logging.getLogger(__name__).error("Job runner module failed to import: %s", exc)
     create_job = None
     get_job = None
+    get_job_status = None
     run_job = None
 
 # ── logging ───────────────────────────────────────────────────────────────────
@@ -76,15 +81,11 @@ api = FastAPI(title="Dev-Strom")
 
 # ── Idea Generation ───────────────────────────────────────────────────────────
 
-@api.post("/ideas")
-def post_ideas(body: IdeasRequest):
-    """Generate project ideas and persist the run to the database."""
-    if not settings.api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Set API_KEY (or OPENROUTER_API_KEY / OPENAI_API_KEY) in .env",
-        )
-
+def _run_ideas_pipeline(body: IdeasRequest) -> dict:
+    """Run the idea-generation pipeline and persist the run. Shared by the
+    sync and async paths of POST /ideas — returns the same dict shape that is
+    the sync path's 200 response body: {ideas, run_id}.
+    """
     intent = body.intent.strip() if body.intent and body.intent.strip() else None
     effective_stack = (body.tech_stack.strip() if body.tech_stack and body.tech_stack.strip() else intent) or ""
 
@@ -144,6 +145,48 @@ def post_ideas(body: IdeasRequest):
         run_id = slugify(effective_stack)
 
     return {"ideas": out, "run_id": run_id}
+
+
+@api.post("/ideas")
+def post_ideas(
+    body: IdeasRequest,
+    background_tasks: BackgroundTasks,
+    async_: bool = Query(False, alias="async"),
+):
+    """Generate project ideas and persist the run to the database.
+
+    Runs synchronously by default (200 with {ideas, run_id}). Pass
+    `?async=true` to schedule it as a background job and get back
+    {job_id, status: pending} immediately (202); subscribe to
+    GET /jobs/{job_id}/events or poll GET /jobs/{job_id}.
+    """
+    if not settings.api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Set API_KEY (or OPENROUTER_API_KEY / OPENAI_API_KEY) in .env",
+        )
+
+    if async_:
+        if create_job is None or run_job is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Job runner module (app.services.jobs) is not available yet.",
+            )
+        try:
+            job_id = create_job(kind="ideas", params=body.model_dump())
+        except Exception:
+            # 503, not 500: the UI only falls back to sync POST /ideas on 503.
+            # Job-store failures (Postgres down, DATABASE_URL unset, missing
+            # jobs table) must not strand generation behind a spinner.
+            logger.exception("Failed to create ideas job")
+            raise HTTPException(
+                status_code=503,
+                detail="Job store unavailable; cannot schedule async idea generation.",
+            ) from None
+        background_tasks.add_task(run_job, job_id, lambda: _run_ideas_pipeline(body))
+        return JSONResponse(status_code=202, content={"job_id": job_id, "status": "pending"})
+
+    return _run_ideas_pipeline(body)
 
 
 # ── Idea Expansion ────────────────────────────────────────────────────────────
@@ -383,11 +426,29 @@ def list_analyses(
 
 # ── Async Jobs (F4) ───────────────────────────────────────────────────────────
 
+def _assert_job_visible(record: dict, job_id: str) -> None:
+    """404 a job owned by someone other than the caller.
+
+    Until auth lands the caller is always anonymous, so a job carrying no
+    user_id — or the anonymous one — is visible. Compare as *strings*:
+    `params` round-trips through JSONB, so `user_id` comes back a str while
+    ANONYMOUS_USER_ID is a uuid.UUID, and a direct `!=` between the two is
+    always True (i.e. it would 404 a job for its own rightful owner).
+    """
+    owner = (record.get("params") or {}).get("user_id")
+    if owner is not None and str(owner) != str(ANONYMOUS_USER_ID):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job {job_id} not found.",
+        )
+
+
 @api.get("/jobs/{job_id}")
 def get_job_detail(job_id: str):
     """Return the status/result of a background job scheduled via
-    `?async=true` on POST /analyze: {job_id, kind, status, params, result,
-    error, created_at, updated_at}. 404 if it does not exist.
+    `?async=true` on POST /analyze or POST /ideas: {job_id, kind, status,
+    params, result, error, created_at, updated_at}. 404 if it does not exist,
+    or if it belongs to another user.
     """
     if get_job is None:
         raise HTTPException(
@@ -401,7 +462,53 @@ def get_job_detail(job_id: str):
             status_code=404,
             detail=f"Job {job_id} not found.",
         )
+    # This response carries the job's full params and result, so it needs the
+    # same ownership gate the SSE subscribe path applies.
+    _assert_job_visible(record, job_id)
     return record
+
+
+@api.get("/jobs/{job_id}/events")
+async def stream_job_events(job_id: str):
+    """Subscribe to a background job's lifecycle over SSE (text/event-stream).
+
+    A *view* of the in-process job (the job row is the source of truth):
+    `status` events on change, a `heartbeat` after 30s of silence, then one
+    terminal `done` (result JSON) or `error` event before closing. If the
+    job is already terminal on subscribe (EventSource reconnect), that event
+    is replayed immediately and the stream closes. 404 if the job does not
+    exist, or if it belongs to another user. The upstream proxy must not
+    buffer this path (see app.services.sse.SSE_HEADERS).
+    """
+    if get_job is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Job runner module (app.services.jobs) is not available yet.",
+        )
+
+    # to_thread: this route is async, so calling the sync DB read directly
+    # would block the event loop for a full round trip on every subscribe.
+    record = await asyncio.to_thread(get_job, job_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job {job_id} not found.",
+        )
+    _assert_job_visible(record, job_id)
+    # Hand the record we just read to the stream as its first pass, so the
+    # gate read above is the only full-row hydration a subscribe costs. For an
+    # already-terminal job (the EventSource reconnect path) that makes the
+    # whole stream zero additional reads.
+    return StreamingResponse(
+        job_event_stream(
+            job_id,
+            get_job_fn=get_job,
+            get_status_fn=get_job_status,
+            initial_record=record,
+        ),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
+    )
 
 
 # ── Health / Readiness ───────────────────────────────────────────────────────
