@@ -7,7 +7,12 @@
  *   event: status     data: {"status": "running"}
  *   event: heartbeat  data: (ignored)
  *   event: done       data: { ...job.result... }
- *   event: error      data: {"message": ...}  (or text detail)
+ *   event: error      data: {"error": ...}
+ *
+ * Note the terminal error key is `error` — that is what app/services/sse.py
+ * emits and what both Python test suites assert on. Reading `message` here
+ * instead is how the backend's real failure reason used to get replaced by a
+ * generic "Job failed." on its way to the user.
  *
  * One terminal `done`/`error` event is emitted before the stream closes; the
  * source is also closed when a terminal event arrives (belt-and-braces vs.
@@ -74,8 +79,12 @@ export function subscribeJob<T = unknown>(
         cleanup();
         let message = "Job failed.";
         try {
-          const parsed = JSON.parse((event as MessageEvent).data) as { message?: string; detail?: string };
-          message = parsed.message ?? parsed.detail ?? message;
+          const parsed = JSON.parse((event as MessageEvent).data) as {
+            error?: string;
+            message?: string;
+            detail?: string;
+          };
+          message = parsed.error ?? parsed.message ?? parsed.detail ?? message;
         } catch {
           message = (event as MessageEvent).data || message;
         }

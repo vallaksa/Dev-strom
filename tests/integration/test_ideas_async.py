@@ -7,6 +7,7 @@ graph are faked on app.api's namespace — no real DB / LLM call.
 import json
 
 from app import api as api_module
+from app.services.models import ANONYMOUS_USER_ID
 from tests.conftest import FakeGraphApp, make_idea
 
 
@@ -31,6 +32,12 @@ def _install_fake_jobs(monkeypatch) -> dict:
     monkeypatch.setattr(api_module, "create_job", _create_job)
     monkeypatch.setattr(api_module, "get_job", store.get)
     monkeypatch.setattr(api_module, "run_job", _run_job)
+    # The SSE poll path reads status only. These fakes always leave the job
+    # terminal, so the stream is served from initial_record and never polls —
+    # but patch it anyway so a future non-terminal test cannot reach a real DB.
+    monkeypatch.setattr(
+        api_module, "get_job_status", lambda job_id: (store.get(job_id) or {}).get("status")
+    )
     return store
 
 
@@ -149,6 +156,43 @@ def test_events_other_users_job_returns_404(client, monkeypatch):
     for record in store.values():
         record["params"]["user_id"] = "someone-else"
     assert client.get(f"/jobs/{job_id}/events").status_code == 404
+
+
+def test_events_anonymous_owned_job_is_visible(client, monkeypatch):
+    """A job explicitly owned by the anonymous user is the caller's own job.
+
+    Regression test for the ownership comparison: `params` round-trips through
+    JSONB so `user_id` is a str, while ANONYMOUS_USER_ID is a uuid.UUID — a
+    direct `!=` between them is always True, which 404s a job for its rightful
+    owner. test_events_other_users_job_returns_404 above passes either way
+    (the types never match), so it is this test that pins the fix.
+    """
+    job_id, store = _completed_job(client, monkeypatch)
+    for record in store.values():
+        record["params"]["user_id"] = str(ANONYMOUS_USER_ID)
+
+    with client.stream("GET", f"/jobs/{job_id}/events") as stream_resp:
+        assert stream_resp.status_code == 200
+        body = "".join(chunk for chunk in stream_resp.iter_text())
+
+    assert _parse_sse(body)[-1][0] == "done"
+
+
+def test_jobs_detail_other_users_job_returns_404(client, monkeypatch):
+    """GET /jobs/{id} returns full params and result, so it needs the same gate."""
+    job_id, store = _completed_job(client, monkeypatch)
+    for record in store.values():
+        record["params"]["user_id"] = "someone-else"
+    assert client.get(f"/jobs/{job_id}").status_code == 404
+
+
+def test_jobs_detail_anonymous_owned_job_is_visible(client, monkeypatch):
+    job_id, store = _completed_job(client, monkeypatch)
+    for record in store.values():
+        record["params"]["user_id"] = str(ANONYMOUS_USER_ID)
+    resp = client.get(f"/jobs/{job_id}")
+    assert resp.status_code == 200
+    assert resp.json()["job_id"] == job_id
 
 
 def test_events_error_job_streams_error_event(client, monkeypatch):

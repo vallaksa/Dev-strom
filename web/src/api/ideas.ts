@@ -1,5 +1,5 @@
 import { ApiError, apiClient } from "./client";
-import { JobStreamError, subscribeJob } from "./jobs";
+import { subscribeJob } from "./jobs";
 import { demoDelay } from "./demo";
 import { sampleIdeas } from "../fixtures/ideas";
 import { isDemoMode } from "../lib/demoMode";
@@ -18,8 +18,14 @@ import type {
  * {job_id, status}, then stream GET /jobs/{job_id}/events (SSE) until the
  * terminal `done` event carries the {ideas, run_id} result. This avoids the
  * long-held sync request that upstream proxies (Cloudflare Tunnel) kill with
- * 524s. Falls back to the sync call only if scheduling itself fails (job
- * runner unavailable / non-202 response).
+ * 524s.
+ *
+ * Falls back to the synchronous call in exactly one case: the scheduling POST
+ * itself returned 503, the backend's signal that the job runner is
+ * unavailable and no job was created. Every other failure is surfaced. That
+ * asymmetry is deliberate — once the scheduling request has left, a job may
+ * already be running and burning an LLM call, and a blanket fallback would
+ * quietly run the whole pipeline (and pay for it) a second time.
  */
 export async function postIdeas(body: IdeasRequest): Promise<IdeasResponse> {
   if (isDemoMode()) {
@@ -32,18 +38,27 @@ export async function postIdeas(body: IdeasRequest): Promise<IdeasResponse> {
       1800,
     );
   }
+  let accepted: JobAcceptedResponse | undefined;
   try {
-    const accepted = await apiClient.post<JobAcceptedResponse>("/ideas", body, {
+    accepted = await apiClient.post<JobAcceptedResponse>("/ideas", body, {
       query: { async: true },
     });
-    if (!accepted?.job_id) throw new ApiError(503, "Job scheduling failed.");
-    return await subscribeJob<IdeasResponse>(accepted.job_id);
   } catch (err) {
-    // Only the scheduling step is eligible for fallback — a failure raised
-    // from the SSE stream (JobStreamError) is a real job/pipeline error.
-    if (err instanceof JobStreamError) throw err;
-    return apiClient.post<IdeasResponse>("/ideas", body);
+    // 503 is the one unambiguous "no job was created" signal, so the sync
+    // path is safe. A network error (ApiError status 0) is NOT: the request
+    // may well have reached the server and started a job, and we must not
+    // run the pipeline twice on a guess.
+    if (err instanceof ApiError && err.status === 503) {
+      return apiClient.post<IdeasResponse>("/ideas", body);
+    }
+    throw err;
   }
+  if (!accepted?.job_id) {
+    throw new ApiError(502, "Job was scheduled but no job id came back.");
+  }
+  // Deliberately outside the try: a stream failure is a real job/pipeline
+  // error and must never re-enter the fallback.
+  return subscribeJob<IdeasResponse>(accepted.job_id);
 }
 
 export async function postExpand(body: ExpandRequest): Promise<ExpandResponse> {

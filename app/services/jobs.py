@@ -24,6 +24,8 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Callable
 
+from sqlalchemy import text
+
 from app.services.db import get_session
 from app.services.models import Job
 
@@ -66,6 +68,40 @@ def get_job(job_id: str) -> dict | None:
         if row is None:
             return None
         return _row_to_dict(row)
+
+
+def get_job_status(job_id: str) -> str | None:
+    """Read only a job's `status` column.
+
+    The SSE poll loop (app.services.sse.job_event_stream) calls this once per
+    tick, where hydrating the full ORM row - dragging the `params` and
+    `result` JSONB across the wire - just to read one TEXT column is the
+    single biggest waste on that path. The full row is fetched exactly once,
+    on the terminal transition, via get_job().
+
+    Returns None both for a missing row and for a malformed job_id, exactly
+    like get_job(). `status` is NOT NULL in the schema, so None is
+    unambiguous.
+
+    Raw text() rather than select(Job.status): it matches the idiom already
+    used by app.services.db.ping(), and it keeps this narrow read independent
+    of the ORM class (which tests/unit/test_jobs.py monkeypatches). The table
+    name is owned by migrations/versions/005_jobs.py.
+
+    The id is bound as a string and cast in SQL rather than passed as a
+    uuid.UUID: unlike the ORM path, a raw bind would rely on the driver's UUID
+    adapter being registered. CAST is index-friendly (it folds to a literal,
+    so the primary key is still used) and correct under any driver config.
+    """
+    try:
+        job_uuid = uuid.UUID(job_id)
+    except (ValueError, TypeError, AttributeError):
+        return None
+    with get_session() as session:
+        return session.execute(
+            text("SELECT status FROM jobs WHERE id = CAST(:id AS uuid)"),
+            {"id": str(job_uuid)},
+        ).scalar_one_or_none()
 
 
 def run_job(job_id: str, fn: Callable[[], dict[str, Any]]) -> None:

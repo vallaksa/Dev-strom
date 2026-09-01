@@ -5,6 +5,7 @@ repository intelligence (POST /analyze). All runs are persisted to PostgreSQL.
 Until auth is implemented, all operations use the ANONYMOUS_USER_ID.
 """
 
+import asyncio
 import logging
 
 from dotenv import load_dotenv
@@ -56,12 +57,13 @@ except ImportError as exc:
 # ── Async Job Runner (F4) ────────────────────────────────────────────────────
 # Guard imports so app.api stays loadable if app.services.jobs is unavailable.
 try:
-    from app.services.jobs import create_job, get_job, run_job
+    from app.services.jobs import create_job, get_job, get_job_status, run_job
     from app.services.sse import SSE_HEADERS, job_event_stream
 except ImportError as exc:
     logging.getLogger(__name__).error("Job runner module failed to import: %s", exc)
     create_job = None
     get_job = None
+    get_job_status = None
     run_job = None
 
 # ── logging ───────────────────────────────────────────────────────────────────
@@ -414,11 +416,29 @@ def list_analyses(
 
 # ── Async Jobs (F4) ───────────────────────────────────────────────────────────
 
+def _assert_job_visible(record: dict, job_id: str) -> None:
+    """404 a job owned by someone other than the caller.
+
+    Until auth lands the caller is always anonymous, so a job carrying no
+    user_id — or the anonymous one — is visible. Compare as *strings*:
+    `params` round-trips through JSONB, so `user_id` comes back a str while
+    ANONYMOUS_USER_ID is a uuid.UUID, and a direct `!=` between the two is
+    always True (i.e. it would 404 a job for its own rightful owner).
+    """
+    owner = (record.get("params") or {}).get("user_id")
+    if owner is not None and str(owner) != str(ANONYMOUS_USER_ID):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job {job_id} not found.",
+        )
+
+
 @api.get("/jobs/{job_id}")
 def get_job_detail(job_id: str):
     """Return the status/result of a background job scheduled via
     `?async=true` on POST /analyze or POST /ideas: {job_id, kind, status,
-    params, result, error, created_at, updated_at}. 404 if it does not exist.
+    params, result, error, created_at, updated_at}. 404 if it does not exist,
+    or if it belongs to another user.
     """
     if get_job is None:
         raise HTTPException(
@@ -432,6 +452,9 @@ def get_job_detail(job_id: str):
             status_code=404,
             detail=f"Job {job_id} not found.",
         )
+    # This response carries the job's full params and result, so it needs the
+    # same ownership gate the SSE subscribe path applies.
+    _assert_job_visible(record, job_id)
     return record
 
 
@@ -440,12 +463,12 @@ async def stream_job_events(job_id: str):
     """Subscribe to a background job's lifecycle over SSE (text/event-stream).
 
     A *view* of the in-process job (the job row is the source of truth):
-    `status` events on change, `heartbeat` every 15s of silence, then one
+    `status` events on change, a `heartbeat` after 30s of silence, then one
     terminal `done` (result JSON) or `error` event before closing. If the
     job is already terminal on subscribe (EventSource reconnect), that event
     is replayed immediately and the stream closes. 404 if the job does not
-    exist. The upstream proxy must not buffer this path (see
-    app.services.sse.SSE_HEADERS).
+    exist, or if it belongs to another user. The upstream proxy must not
+    buffer this path (see app.services.sse.SSE_HEADERS).
     """
     if get_job is None:
         raise HTTPException(
@@ -453,23 +476,26 @@ async def stream_job_events(job_id: str):
             detail="Job runner module (app.services.jobs) is not available yet.",
         )
 
-    record = get_job(job_id)
+    # to_thread: this route is async, so calling the sync DB read directly
+    # would block the event loop for a full round trip on every subscribe.
+    record = await asyncio.to_thread(get_job, job_id)
     if record is None:
         raise HTTPException(
             status_code=404,
             detail=f"Job {job_id} not found.",
         )
-    # Ownership (same rule the JSON poll is meant to enforce once auth lands):
-    # a job whose params carry a user_id different from the caller is 404.
-    # require_user does not exist on main yet, so the caller is anonymous.
-    owner = (record.get("params") or {}).get("user_id")
-    if owner is not None and owner != ANONYMOUS_USER_ID:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Job {job_id} not found.",
-        )
+    _assert_job_visible(record, job_id)
+    # Hand the record we just read to the stream as its first pass, so the
+    # gate read above is the only full-row hydration a subscribe costs. For an
+    # already-terminal job (the EventSource reconnect path) that makes the
+    # whole stream zero additional reads.
     return StreamingResponse(
-        job_event_stream(job_id, get_job_fn=get_job),
+        job_event_stream(
+            job_id,
+            get_job_fn=get_job,
+            get_status_fn=get_job_status,
+            initial_record=record,
+        ),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )
