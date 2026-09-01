@@ -109,8 +109,8 @@ class AnalysisListResponse(BaseModel):
 
 
 # ── Async Jobs (F4) ───────────────────────────────────────────────────────────
-# Documents the `?async=true` response shape for POST /analyze and the
-# GET /jobs/{job_id} response shape.
+# Documents the `?async=true` response shape for POST /analyze and
+# POST /ideas, and the GET /jobs/{job_id} response shape.
 
 class JobAcceptedResponse(BaseModel):
     job_id: str
