@@ -1,70 +1,62 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { useDemoMode } from "../hooks/useDemoMode";
-import { useIdeaGeneration } from "../hooks/useIdeaGeneration";
+import { useSidebar } from "../hooks/useSidebar";
+import { ThemeToggle } from "./ThemeToggle";
+import { Sidebar } from "./sidebar/Sidebar";
 import "./AppShell.css";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Ideas" },
-  { to: "/advisor", label: "Repository Intelligence" },
-  { to: "/history", label: "History" },
-];
+function MenuIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path
+        d="M4 7h16M4 12h16M4 17h16"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { demoMode, forced, setDemoMode } = useDemoMode();
-  const [generation] = useIdeaGeneration();
-  const generating = generation.status === "loading";
+  const { collapsed, toggleSidebar } = useSidebar();
 
   return (
-    <div className="app-shell">
-      <header className="app-shell__header">
-        <div className="app-shell__header-inner">
-          <NavLink to="/" className="app-shell__wordmark">
-            <span className="app-shell__wordmark-mark">DS</span>
-            <span className="app-shell__wordmark-text">
-              Dev&#8209;Strom
-            </span>
-          </NavLink>
-
-          <nav className="app-shell__nav">
-            {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                className={({ isActive }) =>
-                  "app-shell__nav-link" +
-                  (isActive ? " is-active" : "") +
-                  (item.to === "/" && generating ? " is-busy" : "")
-                }
-              >
-                {item.to === "/" && generating ? "Generating…" : item.label}
-              </NavLink>
-            ))}
-          </nav>
-
+    <div className={"app-shell" + (collapsed ? " is-sidebar-collapsed" : "")}>
+      <header className="app-shell__topbar">
+        <div className="app-shell__topbar-left">
           <button
             type="button"
-            className={"demo-toggle" + (demoMode ? " is-on" : "")}
-            onClick={() => setDemoMode(!demoMode)}
-            disabled={forced}
-            title={
-              forced
-                ? "Demo mode is forced on via VITE_DEMO_MODE"
-                : "Toggle demo mode (uses local fixtures instead of the live API)"
-            }
+            className="app-shell__icon-btn"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? "Open menu" : "Close menu"}
+            aria-expanded={!collapsed}
           >
-            <span className="demo-toggle__dot" />
-            {demoMode ? "Demo Mode: On" : "Demo Mode: Off"}
+            <MenuIcon />
           </button>
+        </div>
+
+        <NavLink to="/" className="app-shell__wordmark">
+          <img
+            src="/logo-mark.svg"
+            alt=""
+            className="app-shell__wordmark-mark"
+            width="24"
+            height="24"
+          />
+          <span className="app-shell__wordmark-text">Dev&#8209;Strom</span>
+        </NavLink>
+
+        <div className="app-shell__topbar-right">
+          <ThemeToggle />
         </div>
       </header>
 
-      <main className="app-shell__main">{children}</main>
+      <Sidebar />
 
-      <footer className="app-shell__footer">
-        <span className="mono-label">Dev-Strom &mdash; Idea Generator &amp; Repository Intelligence</span>
-      </footer>
+      <div className="app-shell__body">
+        <main className="app-shell__main">{children}</main>
+      </div>
     </div>
   );
 }

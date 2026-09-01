@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { IdeaCard } from "../components/IdeaCard";
 import { SectionMarker } from "../components/SectionMarker";
 import { ErrorState, LoadingState } from "../components/StateBlocks";
@@ -13,7 +14,8 @@ const EXAMPLES = [
 ];
 
 export function IdeasPage() {
-  const [intent, setIntent] = useState("");
+  const [searchParams] = useSearchParams();
+  const [intent, setIntent] = useState(() => searchParams.get("intent") ?? "");
   const [refinementContext, setRefinementContext] = useState("");
   const [showRefinement, setShowRefinement] = useState(false);
 
@@ -54,7 +56,7 @@ export function IdeasPage() {
 
   return (
     <div className="ideas-page">
-      <SectionMarker index="I" label="Generate Ideas" />
+      <SectionMarker label="Generate Ideas" />
       <h1>What do you want to build?</h1>
       <p className="ideas-page__lede">
         Describe what you're after in plain language — a stack, a domain, the kind of challenge
@@ -144,7 +146,7 @@ export function IdeasPage() {
         {state.status === "success" && (
           <>
             <hr className="hr" />
-            <SectionMarker index="II" label={`${totalIdeas} Ideas`} />
+            <SectionMarker label={`${totalIdeas} Ideas`} />
             {state.batches.map((batch) => (
               <section key={batch.batchId} className="ideas-batch">
                 <p className="ideas-batch__label mono-label">{batch.label}</p>
