@@ -76,15 +76,11 @@ api = FastAPI(title="Dev-Strom")
 
 # ── Idea Generation ───────────────────────────────────────────────────────────
 
-@api.post("/ideas")
-def post_ideas(body: IdeasRequest):
-    """Generate project ideas and persist the run to the database."""
-    if not settings.api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Set API_KEY (or OPENROUTER_API_KEY / OPENAI_API_KEY) in .env",
-        )
-
+def _run_ideas_pipeline(body: IdeasRequest) -> dict:
+    """Run the idea-generation pipeline and persist the run. Shared by the
+    sync and async paths of POST /ideas — returns the same dict shape that is
+    the sync path's 200 response body: {ideas, run_id}.
+    """
     intent = body.intent.strip() if body.intent and body.intent.strip() else None
     effective_stack = (body.tech_stack.strip() if body.tech_stack and body.tech_stack.strip() else intent) or ""
 
@@ -144,6 +140,18 @@ def post_ideas(body: IdeasRequest):
         run_id = slugify(effective_stack)
 
     return {"ideas": out, "run_id": run_id}
+
+
+@api.post("/ideas")
+def post_ideas(body: IdeasRequest):
+    """Generate project ideas and persist the run to the database."""
+    if not settings.api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Set API_KEY (or OPENROUTER_API_KEY / OPENAI_API_KEY) in .env",
+        )
+
+    return _run_ideas_pipeline(body)
 
 
 # ── Idea Expansion ────────────────────────────────────────────────────────────
