@@ -109,6 +109,23 @@ def test_ideas_async_missing_llm_key_returns_503(client, monkeypatch):
     assert resp.status_code == 503
 
 
+def test_ideas_async_create_job_failure_returns_503(client, monkeypatch):
+    """Job-store failures must be 503, not 500.
+
+    The web client only falls back to sync POST /ideas on 503. A 500
+    (Postgres down, DATABASE_URL unset, jobs table missing) leaves the
+    UI with no ideas even though the sync pipeline still works.
+    """
+    def _boom_create_job(kind: str, params: dict) -> str:
+        raise RuntimeError("could not connect to server")
+
+    monkeypatch.setattr(api_module, "create_job", _boom_create_job)
+    monkeypatch.setattr(api_module, "run_job", lambda *a, **k: None)
+
+    resp = client.post("/ideas", params={"async": "true"}, json={"intent": "x"})
+    assert resp.status_code == 503
+
+
 def test_ideas_sync_still_returns_200_with_ideas(client, monkeypatch):
     _patch_ideas_graph(monkeypatch, run_id="ideas-run-sync")
 

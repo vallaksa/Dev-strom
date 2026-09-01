@@ -172,7 +172,17 @@ def post_ideas(
                 status_code=503,
                 detail="Job runner module (app.services.jobs) is not available yet.",
             )
-        job_id = create_job(kind="ideas", params=body.model_dump())
+        try:
+            job_id = create_job(kind="ideas", params=body.model_dump())
+        except Exception:
+            # 503, not 500: the UI only falls back to sync POST /ideas on 503.
+            # Job-store failures (Postgres down, DATABASE_URL unset, missing
+            # jobs table) must not strand generation behind a spinner.
+            logger.exception("Failed to create ideas job")
+            raise HTTPException(
+                status_code=503,
+                detail="Job store unavailable; cannot schedule async idea generation.",
+            ) from None
         background_tasks.add_task(run_job, job_id, lambda: _run_ideas_pipeline(body))
         return JSONResponse(status_code=202, content={"job_id": job_id, "status": "pending"})
 
