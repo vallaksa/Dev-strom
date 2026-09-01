@@ -88,3 +88,21 @@ def test_callback_bad_state_redirects_to_login(client, auth_on):
 def test_providers_lists_configured(client, monkeypatch):
     monkeypatch.setattr(routes_module.providers, "configured_providers", lambda: ["github"])
     assert client.get("/auth/providers").json() == {"providers": ["github"]}
+
+
+def test_mock_login_disabled_by_default_404(client, auth_on):
+    assert client.post("/auth/mock", json={"email": "x@y.com"}).status_code == 404
+
+
+def test_mock_login_creates_user_and_sets_cookie(client, auth_on, monkeypatch):
+    monkeypatch.setattr(routes_module.settings, "mock_auth", True, raising=False)
+    monkeypatch.setattr(
+        routes_module.service,
+        "upsert_user",
+        lambda profile: {"id": str(uuid.uuid4()), "email": profile["email"],
+                         "name": profile["name"], "avatar_url": None, "auth_provider": "mock"},
+    )
+    resp = client.post("/auth/mock", json={"email": "New.User@Example.com"})
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "new.user@example.com"
+    assert "ds_session=" in resp.headers.get("set-cookie", "")

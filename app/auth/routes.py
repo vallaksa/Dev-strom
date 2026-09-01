@@ -9,6 +9,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from pydantic import BaseModel
 
 from app.auth import providers, service, session
 from app.auth.deps import require_user
@@ -50,6 +51,31 @@ def logout(response: Response) -> Response:
     session.clear_session_cookie(response)
     response.status_code = 204
     return response
+
+
+class MockLogin(BaseModel):
+    email: str
+    name: str | None = None
+
+
+@router.post("/mock")
+def mock_login(body: MockLogin, response: Response) -> dict:
+    """Dev-only passwordless sign-in (MOCK_AUTH=true). Enter an email and
+    you become that user — a new one the first time, the same one after."""
+    if not providers.is_configured("mock"):
+        raise HTTPException(404, "Mock sign-in is not enabled")
+    email = body.email.strip().lower()
+    if "@" not in email:
+        raise HTTPException(422, "Enter a valid email")
+    user = service.upsert_user({
+        "provider": "mock",
+        "provider_user_id": email,
+        "email": email,
+        "name": body.name or email.split("@")[0].replace(".", " ").title(),
+        "avatar_url": None,
+    })
+    session.set_session_cookie(response, uuid.UUID(user["id"]))
+    return user
 
 
 @router.get("/{provider}/login")

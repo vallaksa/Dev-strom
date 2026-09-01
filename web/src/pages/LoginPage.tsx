@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import "./LoginPage.css";
@@ -39,6 +39,9 @@ export function LoginPage() {
   const { status, signIn, getProviders } = useAuth();
   const [params] = useSearchParams();
   const [providers, setProviders] = useState<string[] | null>(null);
+  const [mockEmail, setMockEmail] = useState("");
+  const [mockBusy, setMockBusy] = useState(false);
+  const [mockError, setMockError] = useState<string | null>(null);
   const next = params.get("next") || "/ideas";
   const error = params.get("error");
 
@@ -50,6 +53,29 @@ export function LoginPage() {
     window.location.replace(next.startsWith("/") ? next : "/ideas");
     return null;
   }
+
+  const oauthProviders = (providers ?? []).filter((p) => p !== "mock");
+  const hasMock = (providers ?? []).includes("mock");
+
+  const handleMock = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!mockEmail.trim() || mockBusy) return;
+    setMockBusy(true);
+    setMockError(null);
+    try {
+      const res = await fetch("/api/auth/mock", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: mockEmail.trim() }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      window.location.replace(next.startsWith("/") ? next : "/ideas");
+    } catch {
+      setMockError("Couldn't sign in — check the email and try again.");
+      setMockBusy(false);
+    }
+  };
 
   return (
     <div className="login-page">
@@ -74,7 +100,7 @@ export function LoginPage() {
               No sign-in providers are configured on this server.
             </p>
           )}
-          {providers?.map((p) => (
+          {oauthProviders.map((p) => (
             <button
               key={p}
               type="button"
@@ -85,6 +111,29 @@ export function LoginPage() {
               {PROVIDER_LABEL[p] ?? `Continue with ${p}`}
             </button>
           ))}
+
+          {hasMock && (
+            <form className="login-card__mock" onSubmit={handleMock}>
+              {oauthProviders.length > 0 && <span className="login-card__or mono-label">or</span>}
+              <input
+                type="email"
+                className="input"
+                placeholder="you@example.com"
+                value={mockEmail}
+                onChange={(e) => setMockEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
+              <button
+                type="submit"
+                className="btn btn-primary login-card__provider"
+                disabled={mockBusy || !mockEmail.trim()}
+              >
+                {mockBusy ? "Signing in…" : "Continue with email"}
+              </button>
+              {mockError && <p className="login-card__error">{mockError}</p>}
+            </form>
+          )}
         </div>
 
         <Link to="/" className="login-card__back mono-label">

@@ -52,16 +52,18 @@ def _configs() -> dict[str, _ProviderConfig]:
 
 
 def is_supported(provider: str) -> bool:
-    return provider in ("google", "github")
+    return provider in ("google", "github", "mock")
 
 
 def is_configured(provider: str) -> bool:
+    if provider == "mock":
+        return settings.mock_auth
     cfg = _configs().get(provider)
     return bool(cfg and cfg.client_id and cfg.client_secret)
 
 
 def configured_providers() -> list[str]:
-    return [p for p in ("google", "github") if is_configured(p)]
+    return [p for p in ("google", "github", "mock") if is_configured(p)]
 
 
 def redirect_uri(provider: str) -> str:

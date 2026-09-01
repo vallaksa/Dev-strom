@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # HMAC secret for the JWT session cookie. Required when auth_enabled.
     session_secret: str | None = Field(default=None, alias="SESSION_SECRET")
     session_ttl_days: int = Field(default=7, alias="SESSION_TTL_DAYS")
+    # Dev-only: adds a passwordless "mock" provider (enter an email → become
+    # that user) so the sign-in flow can be exercised without OAuth apps.
+    # Never enable in production.
+    mock_auth: bool = Field(default=False, alias="MOCK_AUTH")
 
     google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
     google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
