@@ -49,12 +49,14 @@ All POST bodies are JSON (`-H 'content-type: application/json'`).
 curl -sX POST localhost:8000/ideas \
   -d '{"intent": "Event-driven fintech backend with strong audit trails"}'
 
-# Expand / export one idea (pid 1–N, reuse the run_id)
-curl -sX POST localhost:8000/expand -d '{"run_id": "...", "pid": 1}'
-curl -sX POST localhost:8000/export -d '{"run_id": "...", "pid": 1}' -o idea.md
+**Docs (when API is running):** [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger), [http://localhost:8000/redoc](http://localhost:8000/redoc) (ReDoc).
 
-# Analyze a repository — findings, recommendations, architecture graph
-curl -sX POST localhost:8000/analyze -d '{"repo_url": "https://github.com/user/repo"}'
+---
+
+## Architecture
+
+### End-to-end flow (Ideas)
+
 ```
 
 Past runs: `GET /history`, `GET /analyses`. Health: `GET /health`, `GET /ready`.

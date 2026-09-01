@@ -1,7 +1,7 @@
 """Minimal in-process background job runner.
 
-Not a task queue (no Celery/Redis/etc): per docs/PLAN.md's bias towards lean,
-just-in-time infra, this is deliberately just three functions plus a
+Not a task queue (no Celery/Redis/etc): keeping infra lean and
+just-in-time, this is deliberately just three functions plus a
 Postgres-backed record, designed to be handed to FastAPI's
 `BackgroundTasks.add_task(...)`:
 
