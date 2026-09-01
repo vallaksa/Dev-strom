@@ -27,6 +27,16 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import api as api_module  # noqa: E402
+from app.config import settings as _settings  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _auth_disabled_by_default(monkeypatch):
+    """Pin the login gate OFF for every test regardless of the developer's
+    local .env. Tests that exercise auth opt back in via the `auth_on`
+    fixture."""
+    monkeypatch.setattr(_settings, "auth_enabled", False, raising=False)
+    monkeypatch.setattr(_settings, "mock_auth", False, raising=False)
 
 
 @pytest.fixture()
