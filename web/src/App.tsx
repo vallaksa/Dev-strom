@@ -3,9 +3,11 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { LoadingState } from "./components/StateBlocks";
 
+const LandingPage = lazy(() =>
+  import("./pages/LandingPage").then((m) => ({ default: m.LandingPage })),
+);
 const IdeasPage = lazy(() => import("./pages/IdeasPage").then((m) => ({ default: m.IdeasPage })));
 const AdvisorPage = lazy(() => import("./pages/AdvisorPage").then((m) => ({ default: m.AdvisorPage })));
-const HistoryPage = lazy(() => import("./pages/HistoryPage").then((m) => ({ default: m.HistoryPage })));
 const RunDetailPage = lazy(() =>
   import("./pages/RunDetailPage").then((m) => ({ default: m.RunDetailPage })),
 );
@@ -13,28 +15,22 @@ const AnalysisDetailPage = lazy(() =>
   import("./pages/AnalysisDetailPage").then((m) => ({ default: m.AnalysisDetailPage })),
 );
 
-function isKnownPath(pathname: string): boolean {
-  if (pathname === "/" || pathname === "/advisor" || pathname === "/history") {
-    return true;
-  }
+function isKnownAppPath(pathname: string): boolean {
+  if (pathname === "/ideas" || pathname === "/advisor") return true;
   return /^\/history\/[^/]+$/.test(pathname) || /^\/analysis\/[^/]+$/.test(pathname);
 }
 
-/** Keep main tabs mounted (hidden when inactive) so async work survives navigation. */
-function TabbedRoutes() {
+/** Everything under the app shell. Keeps the two main tabs mounted (hidden
+ *  when inactive) so async work survives navigation. */
+function AppRoutes() {
   const { pathname } = useLocation();
 
-  if (pathname === "/cartographer") {
-    return <Navigate to="/advisor" replace />;
-  }
+  if (pathname === "/cartographer") return <Navigate to="/advisor" replace />;
+  if (pathname === "/history") return <Navigate to="/ideas" replace />;
+  if (!isKnownAppPath(pathname)) return <Navigate to="/ideas" replace />;
 
-  if (!isKnownPath(pathname)) {
-    return <Navigate to="/" replace />;
-  }
-
-  const showIdeas = pathname === "/";
+  const showIdeas = pathname === "/ideas";
   const showAdvisor = pathname === "/advisor";
-  const showHistory = pathname === "/history";
 
   return (
     <>
@@ -43,9 +39,6 @@ function TabbedRoutes() {
       </div>
       <div className="tab-panel" hidden={!showAdvisor} aria-hidden={!showAdvisor}>
         <AdvisorPage />
-      </div>
-      <div className="tab-panel" hidden={!showHistory} aria-hidden={!showHistory}>
-        <HistoryPage />
       </div>
 
       <Routes>
@@ -58,11 +51,12 @@ function TabbedRoutes() {
 
 function App() {
   return (
-    <AppShell>
-      <Suspense fallback={<LoadingState label="Loading page" />}>
-        <TabbedRoutes />
-      </Suspense>
-    </AppShell>
+    <Suspense fallback={<LoadingState label="Loading page" />}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="*" element={<AppShell><AppRoutes /></AppShell>} />
+      </Routes>
+    </Suspense>
   );
 }
 

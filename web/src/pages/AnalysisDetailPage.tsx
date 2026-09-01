@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { getAnalysis } from "../api/analyze";
 import { RepoIntelligence } from "../components/repo/RepoIntelligence";
 import { SectionMarker } from "../components/SectionMarker";
@@ -8,14 +8,19 @@ import "./RunDetailPage.css"; // shared .run-detail-page__back link style
 
 export function AnalysisDetailPage() {
   const { runId = "" } = useParams();
+  const navigate = useNavigate();
   const state = useAsyncData(() => getAnalysis(runId), [runId]);
 
   return (
     <div className="analysis-detail-page">
-      <Link to="/history" className="run-detail-page__back mono-label">
-        &larr; Back to History
-      </Link>
-      <SectionMarker index="II" label="Repository Intelligence" />
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="run-detail-page__back mono-label"
+      >
+        &larr; Back
+      </button>
+      <SectionMarker label="Repository Intelligence" />
 
       {state.status === "loading" && <LoadingState label="Loading analysis" />}
       {state.status === "error" && <ErrorState message={state.error} onRetry={state.reload} />}
