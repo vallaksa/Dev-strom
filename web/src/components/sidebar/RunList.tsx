@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Link, useMatch } from "react-router-dom";
 import { EmptyState, ErrorState, LoadingState } from "../StateBlocks";
 import { useRuns } from "../../hooks/useRuns";
+import { useSidebar } from "../../hooks/useSidebar";
+import type { RunGroup } from "../../lib/sidebar";
 import type { AnalysisSummary, HistoryRun } from "../../api/types";
 
 function relativeTime(iso: string): string {
@@ -45,6 +47,50 @@ function AnalysisGlyph() {
       <circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" />
       <path d="m20 20-4.5-4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={"run-list__chevron" + (open ? " is-open" : "")}
+      viewBox="0 0 24 24"
+      width="12"
+      height="12"
+      aria-hidden="true"
+    >
+      <path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Group({
+  id,
+  label,
+  count,
+  children,
+}: {
+  id: RunGroup;
+  label: string;
+  count: number;
+  children: ReactNode;
+}) {
+  const { isGroupCollapsed, toggleGroup } = useSidebar();
+  const open = !isGroupCollapsed(id);
+  return (
+    <section className="run-list__group">
+      <button
+        type="button"
+        className="run-list__heading"
+        aria-expanded={open}
+        onClick={() => toggleGroup(id)}
+      >
+        <Chevron open={open} />
+        <span className="mono-label">{label}</span>
+        <span className="run-list__count">{count}</span>
+      </button>
+      {open && children}
+    </section>
   );
 }
 
@@ -94,8 +140,7 @@ export function RunList() {
   return (
     <div className="run-list">
       {analyses.length > 0 && (
-        <section className="run-list__group">
-          <p className="run-list__heading mono-label">Repo Analyses</p>
+        <Group id="analyses" label="Repo Analyses" count={analyses.length}>
           {analyses.map((a) => (
             <RunRow
               key={a.run_id}
@@ -110,12 +155,11 @@ export function RunList() {
               }
             />
           ))}
-        </section>
+        </Group>
       )}
 
       {ideas.length > 0 && (
-        <section className="run-list__group">
-          <p className="run-list__heading mono-label">Ideas</p>
+        <Group id="ideas" label="Ideas" count={ideas.length}>
           {ideas.map((run) => (
             <RunRow
               key={run.run_id}
@@ -126,7 +170,7 @@ export function RunList() {
               meta={relativeTime(run.created_at)}
             />
           ))}
-        </section>
+        </Group>
       )}
     </div>
   );

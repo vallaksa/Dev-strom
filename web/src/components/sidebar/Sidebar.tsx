@@ -33,6 +33,14 @@ export function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  // Esc closes the menu.
+  useEffect(() => {
+    if (collapsed) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSidebarCollapsed(true);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [collapsed, setSidebarCollapsed]);
+
   return (
     <>
       {!collapsed && (

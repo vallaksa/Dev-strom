@@ -1,37 +1,40 @@
 .app-shell {
   --sidebar-w: 264px;
+  --topbar-h: 56px;
   min-height: 100vh;
 }
 
-/* The sidebar is position:fixed (see Sidebar.css); the body just leaves a
-   gutter for it and closes the gutter when it collapses or on mobile. */
-.app-shell__body {
-  min-width: 0;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  margin-left: var(--sidebar-w);
-  transition: margin-left 200ms ease;
-}
-
-.app-shell.is-sidebar-collapsed .app-shell__body {
-  margin-left: 0;
-}
-
-/* ── slim top bar ─────────────────────────────────────────────────────── */
+/* ── top bar: fixed, full width, constant ─────────────────────────────── */
 .app-shell__topbar {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 15;
-  display: flex;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  height: var(--topbar-h);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-6);
+  padding: 0 var(--space-4);
   background: var(--bg);
   border-bottom: var(--hairline) solid var(--border);
 }
 
-.app-shell__menu-btn {
+.app-shell__topbar-left {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.app-shell__topbar-right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+}
+
+.app-shell__icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -42,15 +45,17 @@
   border: var(--hairline) solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
+  text-decoration: none;
   transition: background-color 120ms ease, color 120ms ease;
 }
 
-.app-shell__menu-btn:hover {
+.app-shell__icon-btn:hover {
   background: var(--surface-2);
   color: var(--ink);
 }
 
 .app-shell__wordmark {
+  justify-self: center;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -62,32 +67,54 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   background: var(--accent);
   color: var(--accent-ink);
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   border-radius: var(--radius-sm);
 }
 
 .app-shell__wordmark-text {
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* ── body: clears the fixed bar ──────────────────────────────────────── */
+.app-shell__body {
+  min-height: 100vh;
+  padding-top: var(--topbar-h);
+  transition: padding-left 200ms ease;
 }
 
 .app-shell__main {
-  flex: 1;
   width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   padding: var(--space-6);
 }
 
-@media (max-width: 900px) {
+/* Desktop: while the menu is open, keep a gutter so it never covers the
+   content (the content re-centres in the remaining space rather than
+   being shoved sideways). Mobile: menu floats over with a backdrop. */
+@media (min-width: 901px) {
+  .app-shell:not(.is-sidebar-collapsed) .app-shell__body {
+    padding-left: var(--sidebar-w);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   .app-shell__body {
-    margin-left: 0;
+    transition: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell__wordmark-text {
+    display: none;
   }
 }

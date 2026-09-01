@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useDemoMode } from "../../hooks/useDemoMode";
-import { ThemeToggle } from "../ThemeToggle";
 import { AuthModal } from "./AuthModal";
 
 function initials(name: string): string {
@@ -66,11 +65,6 @@ export function ProfileBlock({ collapsed }: { collapsed: boolean }) {
               <span className="profile-block__sub">{user.email}</span>
             </div>
           )}
-
-          <div className="profile-menu__row is-static">
-            <span>Theme</span>
-            <ThemeToggle />
-          </div>
 
           <button
             type="button"
