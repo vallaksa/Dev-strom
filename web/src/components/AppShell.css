@@ -88,29 +88,23 @@
 .app-shell__body {
   min-height: 100vh;
   padding-top: var(--topbar-h);
-  transition: padding-left 200ms ease;
 }
 
-.app-shell__main {
-  width: 100%;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: var(--space-6);
-}
-
-/* Desktop: while the menu is open, keep a gutter so it never covers the
-   content (the content re-centres in the remaining space rather than
-   being shoved sideways). Mobile: menu floats over with a backdrop. */
+/* Desktop: the content column always sits in the space to the right of
+   the side menu — a permanent gutter the width of the menu. It therefore
+   does NOT move when the menu opens or closes; the menu just slides into
+   (or out of) its own reserved lane. Content centres within what's left. */
 @media (min-width: 901px) {
-  .app-shell:not(.is-sidebar-collapsed) .app-shell__body {
+  .app-shell__body {
     padding-left: var(--sidebar-w);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .app-shell__body {
-    transition: none;
-  }
+.app-shell__main {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-6);
 }
 
 @media (max-width: 560px) {
