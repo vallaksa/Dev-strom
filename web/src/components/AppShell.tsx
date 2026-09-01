@@ -18,20 +18,6 @@ function MenuIcon() {
   );
 }
 
-function ComposeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-      <path
-        d="M4 20h16M6.5 16.5 16 7l-2.5-2.5L4 14v2.5h2.5Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const { collapsed, toggleSidebar } = useSidebar();
 
@@ -48,15 +34,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <MenuIcon />
           </button>
-          <NavLink
-            to="/"
-            end
-            className="app-shell__icon-btn"
-            aria-label="New ideas"
-            title="New ideas"
-          >
-            <ComposeIcon />
-          </NavLink>
         </div>
 
         <NavLink to="/" className="app-shell__wordmark">
