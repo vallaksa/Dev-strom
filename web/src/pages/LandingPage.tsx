@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
+import { ThemeToggle } from "../components/ThemeToggle";
 import "./LandingPage.css";
 
 const GITHUB_URL = "https://github.com/vallaksa/Dev-strom";
@@ -70,9 +71,9 @@ export function LandingPage() {
               GitHub
             </a>
           </nav>
-          <Link to="/ideas" className="btn btn-primary btn-sm landing-nav__cta">
-            Get Started
-          </Link>
+          <div className="landing-nav__cta">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
@@ -100,7 +101,7 @@ export function LandingPage() {
               />
             </div>
             <button type="submit" className="btn btn-primary landing-terminal__go">
-              Generate Ideas
+              Get Started
             </button>
           </form>
         </section>
