@@ -6,15 +6,15 @@
 - analysis_runs: add `user_id` (FK users, NOT NULL, defaults to the
   anonymous user so existing rows stay valid).
 
-Revision: 003
+Revision: 008
 """
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision = "003_provider_auth"
-down_revision = "002_seed_anonymous_user"
+revision = "008_provider_auth"
+down_revision = "007_run_slugs"
 branch_labels = None
 depends_on = None
 
