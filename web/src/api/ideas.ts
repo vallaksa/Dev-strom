@@ -1,9 +1,26 @@
-import { apiClient } from "./client";
+import { ApiError, apiClient } from "./client";
+import { JobStreamError, subscribeJob } from "./jobs";
 import { demoDelay } from "./demo";
 import { sampleIdeas } from "../fixtures/ideas";
 import { isDemoMode } from "../lib/demoMode";
-import type { ExpandRequest, ExpandResponse, ExportRequest, Idea, IdeasRequest, IdeasResponse } from "./types";
+import type {
+  ExpandRequest,
+  ExpandResponse,
+  ExportRequest,
+  Idea,
+  IdeasRequest,
+  IdeasResponse,
+  JobAcceptedResponse,
+} from "./types";
 
+/**
+ * Generate ideas via the async job pipeline: POST /ideas?async=true → 202
+ * {job_id, status}, then stream GET /jobs/{job_id}/events (SSE) until the
+ * terminal `done` event carries the {ideas, run_id} result. This avoids the
+ * long-held sync request that upstream proxies (Cloudflare Tunnel) kill with
+ * 524s. Falls back to the sync call only if scheduling itself fails (job
+ * runner unavailable / non-202 response).
+ */
 export async function postIdeas(body: IdeasRequest): Promise<IdeasResponse> {
   if (isDemoMode()) {
     const count = Math.max(1, Math.min(5, body.count || sampleIdeas.length));
@@ -15,7 +32,18 @@ export async function postIdeas(body: IdeasRequest): Promise<IdeasResponse> {
       1800,
     );
   }
-  return apiClient.post<IdeasResponse>("/ideas", body);
+  try {
+    const accepted = await apiClient.post<JobAcceptedResponse>("/ideas", body, {
+      query: { async: true },
+    });
+    if (!accepted?.job_id) throw new ApiError(503, "Job scheduling failed.");
+    return await subscribeJob<IdeasResponse>(accepted.job_id);
+  } catch (err) {
+    // Only the scheduling step is eligible for fallback — a failure raised
+    // from the SSE stream (JobStreamError) is a real job/pipeline error.
+    if (err instanceof JobStreamError) throw err;
+    return apiClient.post<IdeasResponse>("/ideas", body);
+  }
 }
 
 export async function postExpand(body: ExpandRequest): Promise<ExpandResponse> {
