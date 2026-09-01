@@ -1,14 +1,16 @@
 """Dev-Strom FastAPI server.
 
 Exposes endpoints for idea generation, expansion, export, history, and
-repository intelligence (POST /analyze). All runs are persisted to PostgreSQL.
-Until auth is implemented, all operations use the ANONYMOUS_USER_ID.
+repository intelligence (POST /analyze). All runs are persisted to PostgreSQL
+and scoped to the requesting user. When AUTH_ENABLED is false every request
+resolves to the seeded anonymous user (see app.auth).
 """
 
 import logging
+import uuid
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.models.dto import (
@@ -20,6 +22,8 @@ from app.models.dto import (
 
 load_dotenv()
 
+from app.auth.deps import require_user
+from app.auth.routes import router as auth_router
 from app.config import settings
 from app.graph import app as graph_app, expand_idea as graph_expand_idea
 from app.services import db
@@ -72,12 +76,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 api = FastAPI(title="Dev-Strom")
+api.include_router(auth_router)
 
 
 # ── Idea Generation ───────────────────────────────────────────────────────────
 
 @api.post("/ideas")
-def post_ideas(body: IdeasRequest):
+def post_ideas(body: IdeasRequest, user: dict = Depends(require_user)):
     """Generate project ideas and persist the run to the database."""
     if not settings.api_key:
         raise HTTPException(
@@ -137,6 +142,7 @@ def post_ideas(body: IdeasRequest):
             enable_multi_query=body.enable_multi_query,
             ideas=out,
             web_context=result.get("web_context"),
+            user_id=uuid.UUID(user["id"]),
         )
     except Exception:
         logger.exception("Failed to persist idea run; returning generated ideas anyway")
@@ -149,7 +155,7 @@ def post_ideas(body: IdeasRequest):
 # ── Idea Expansion ────────────────────────────────────────────────────────────
 
 @api.post("/expand")
-def post_expand(body: ExpandRequest):
+def post_expand(body: ExpandRequest, user: dict = Depends(require_user)):
     """Expand a single idea into a deeper implementation plan."""
     if not settings.api_key:
         raise HTTPException(
@@ -157,8 +163,8 @@ def post_expand(body: ExpandRequest):
             detail="Set API_KEY in .env",
         )
 
-    # Load run from database
-    run = get_run(run_id=body.run_id)
+    # Load run from database (scoped to the caller)
+    run = get_run(run_id=body.run_id, owner_id=uuid.UUID(user["id"]))
     if run is None:
         raise HTTPException(
             status_code=404,
@@ -191,9 +197,10 @@ def post_expand(body: ExpandRequest):
 # ── Export ─────────────────────────────────────────────────────────────────────
 
 @api.post("/export")
-def post_export(body: ExportRequest):
+def post_export(body: ExportRequest, user: dict = Depends(require_user)):
     """Export an expanded idea as a downloadable Markdown file."""
-    run = get_run(run_id=body.run_id)
+    owner_id = uuid.UUID(user["id"])
+    run = get_run(run_id=body.run_id, owner_id=owner_id)
     if run is None:
         raise HTTPException(
             status_code=404,
@@ -218,7 +225,7 @@ def post_export(body: ExportRequest):
     latest = get_latest_expansion(run_id=body.run_id, pid=body.pid)
     if latest is not None:
         extended_plan = latest["extended_plan"]
-        run = get_run(run_id=body.run_id)
+        run = get_run(run_id=body.run_id, owner_id=owner_id)
         assert run is not None
         idea = run["ideas"][body.pid - 1].copy()
         idea.pop("pid", None)
@@ -252,18 +259,19 @@ def post_export(body: ExportRequest):
 
 @api.get("/history")
 def get_history(
+    user: dict = Depends(require_user),
     limit: int = Query(default=20, ge=1, le=100, description="Max runs to return"),
     offset: int = Query(default=0, ge=0, description="Pagination offset"),
 ):
     """Return the user's past runs, most recent first."""
-    runs = load_history(limit=limit, offset=offset)
+    runs = load_history(user_id=uuid.UUID(user["id"]), limit=limit, offset=offset)
     return {"runs": runs, "limit": limit, "offset": offset}
 
 
 @api.get("/runs/{run_id}")
-def get_run_detail(run_id: str):
+def get_run_detail(run_id: str, user: dict = Depends(require_user)):
     """Return full details of a single run including all ideas."""
-    run = get_run(run_id=run_id)
+    run = get_run(run_id=run_id, owner_id=uuid.UUID(user["id"]))
     if run is None:
         raise HTTPException(
             status_code=404,
@@ -291,13 +299,15 @@ def _analysis_response(run_id: str, analysis: dict, graph: dict | None) -> dict:
     return {"run_id": run_id, **analysis, "graph": graph}
 
 
-def _run_analyze_pipeline(target: str, repo_url: str | None) -> dict:
+def _run_analyze_pipeline(target: str, repo_url: str | None, user_id: uuid.UUID) -> dict:
     """Run the evidence-first analysis pipeline and persist the result. Shared
     by the sync and async paths of POST /analyze — returns the same dict shape
     that is the sync path's 200 response body."""
     analysis, project_graph = analyze_repository_with_graph(target, repo_url=repo_url)
     graph_dict = _to_dict(project_graph)
-    run_id = save_analysis_run(analysis, project_graph=graph_dict, repo_url=repo_url)
+    run_id = save_analysis_run(
+        analysis, project_graph=graph_dict, repo_url=repo_url, user_id=user_id
+    )
     return _analysis_response(run_id, _to_dict(analysis), graph_dict)
 
 
@@ -305,6 +315,7 @@ def _run_analyze_pipeline(target: str, repo_url: str | None) -> dict:
 def post_analyze(
     body: AnalyzeRequest,
     background_tasks: BackgroundTasks,
+    user: dict = Depends(require_user),
     async_: bool = Query(False, alias="async"),
 ):
     """Produce an evidence-first Repository Intelligence Analysis: ingest the
@@ -327,6 +338,7 @@ def post_analyze(
         )
 
     target = body.repo_url or body.path
+    owner_id = uuid.UUID(user["id"])
 
     if async_:
         if create_job is None or run_job is None:
@@ -334,22 +346,24 @@ def post_analyze(
                 status_code=503,
                 detail="Job runner module (app.services.jobs) is not available yet.",
             )
-        job_id = create_job(kind="analyze", params=body.model_dump())
-        background_tasks.add_task(run_job, job_id, lambda: _run_analyze_pipeline(target, body.repo_url))
+        job_id = create_job(kind="analyze", params={**body.model_dump(), "user_id": str(owner_id)})
+        background_tasks.add_task(
+            run_job, job_id, lambda: _run_analyze_pipeline(target, body.repo_url, owner_id)
+        )
         return JSONResponse(status_code=202, content={"job_id": job_id, "status": "pending"})
 
     try:
-        return _run_analyze_pipeline(target, body.repo_url)
+        return _run_analyze_pipeline(target, body.repo_url, owner_id)
     except Exception as exc:
         logger.exception("Analyze pipeline failed for %r", target)
         raise HTTPException(status_code=500, detail=f"Analyze failed: {exc}") from exc
 
 
 @api.get("/analyze/{run_id}")
-def get_analyze_run_detail(run_id: str):
+def get_analyze_run_detail(run_id: str, user: dict = Depends(require_user)):
     """Return a previously persisted analysis run in the same flat shape as
-    POST /analyze (Analysis fields + `graph` + `mermaid`), so the UI's History
-    can reload a past run. 404 if it does not exist.
+    POST /analyze (Analysis fields + `graph` + `mermaid`), so the UI can
+    reload a past run. 404 if it does not exist or isn't the caller's.
     """
     if get_analysis_run is None:
         raise HTTPException(
@@ -357,7 +371,7 @@ def get_analyze_run_detail(run_id: str):
             detail="Analyzer core modules (app.cartographer.analysis_store) are not available yet.",
         )
 
-    record = get_analysis_run(run_id)
+    record = get_analysis_run(run_id, owner_id=uuid.UUID(user["id"]))
     if record is None:
         raise HTTPException(status_code=404, detail=f"Analysis run {run_id} not found.")
     return _analysis_response(record["run_id"], record["analysis"], record.get("project_graph"))
@@ -365,29 +379,31 @@ def get_analyze_run_detail(run_id: str):
 
 @api.get("/analyses")
 def list_analyses(
+    user: dict = Depends(require_user),
     limit: int = Query(default=20, ge=1, le=100, description="Max analysis runs to return"),
     offset: int = Query(default=0, ge=0, description="Pagination offset"),
 ):
-    """List recent analysis runs as lightweight summary rows (run_id, repo_url,
-    language, status, finding/recommendation counts, created_at) for a History
-    list — most recent first. Mirrors GET /history's paging shape.
+    """List the caller's recent analysis runs as lightweight summary rows
+    (run_id, repo_url, language, status, finding/recommendation counts,
+    created_at) — most recent first. Mirrors GET /history's paging shape.
     """
     if list_analysis_runs is None:
         raise HTTPException(
             status_code=503,
             detail="Analyzer core modules (app.cartographer.analysis_store) are not available yet.",
         )
-    analyses = list_analysis_runs(limit=limit, offset=offset)
+    analyses = list_analysis_runs(limit=limit, offset=offset, owner_id=uuid.UUID(user["id"]))
     return {"analyses": analyses, "limit": limit, "offset": offset}
 
 
 # ── Async Jobs (F4) ───────────────────────────────────────────────────────────
 
 @api.get("/jobs/{job_id}")
-def get_job_detail(job_id: str):
+def get_job_detail(job_id: str, user: dict = Depends(require_user)):
     """Return the status/result of a background job scheduled via
     `?async=true` on POST /analyze: {job_id, kind, status, params, result,
-    error, created_at, updated_at}. 404 if it does not exist.
+    error, created_at, updated_at}. 404 if it does not exist or isn't the
+    caller's.
     """
     if get_job is None:
         raise HTTPException(
@@ -396,7 +412,8 @@ def get_job_detail(job_id: str):
         )
 
     record = get_job(job_id)
-    if record is None:
+    owned = record and (record.get("params") or {}).get("user_id") in (None, user["id"])
+    if record is None or not owned:
         raise HTTPException(
             status_code=404,
             detail=f"Job {job_id} not found.",

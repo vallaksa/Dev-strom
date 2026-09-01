@@ -127,7 +127,7 @@ def test_ideas_passes_refinement_context_to_graph(client, monkeypatch):
 def test_expand_persists_implementation_plan_on_run(client, monkeypatch, sample_run):
     saved = {}
 
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: sample_run)
     monkeypatch.setattr(
         api_module,
         "graph_expand_idea",
@@ -218,7 +218,7 @@ def test_ideas_does_not_500_on_under_generation(client, monkeypatch):
 
 
 def test_expand_happy_path(client, monkeypatch, sample_run):
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: sample_run)
     monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: "expanded-1")
     monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: None)
     monkeypatch.setattr(
@@ -241,13 +241,13 @@ def test_expand_missing_api_key_returns_503(client, monkeypatch, sample_run):
 
 
 def test_expand_run_not_found_returns_404(client, monkeypatch):
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: None)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: None)
     resp = client.post("/expand", json={"run_id": "missing-run", "pid": 1})
     assert resp.status_code == 404
 
 
 def test_expand_invalid_pid_returns_400(client, monkeypatch, sample_run):
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: sample_run)
     resp = client.post("/expand", json={"run_id": sample_run["run_id"], "pid": 99})
     assert resp.status_code == 400
 
@@ -261,7 +261,7 @@ def test_export_current_behavior_returns_markdown_with_attachment_header(client,
     and then persist the result. Verifies the markdown body and
     Content-Disposition header.
     """
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: sample_run)
     monkeypatch.setattr(api_module, "get_latest_expansion", lambda *, run_id, pid: None)
     monkeypatch.setattr(api_module, "save_expanded_idea", lambda **kwargs: "expanded-1")
     monkeypatch.setattr(api_module, "update_run_idea", lambda **kwargs: None)
@@ -293,7 +293,7 @@ def test_export_target_uses_persisted_expansion(client, monkeypatch, sample_run)
         expand_calls["count"] += 1
         return {"idea": idea, "extended_plan": ["Should not be used - not persisted path"]}
 
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: sample_run)
     monkeypatch.setattr(api_module, "graph_expand_idea", fake_expand)
     # app/api.py does `from app.services.run_service import get_latest_expansion`,
     # so the name it calls lives in api_module's namespace, not run_service's -
@@ -315,13 +315,13 @@ def test_export_target_uses_persisted_expansion(client, monkeypatch, sample_run)
 
 
 def test_export_run_not_found_returns_404(client, monkeypatch):
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: None)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: None)
     resp = client.post("/export", json={"run_id": "missing-run", "pid": 1})
     assert resp.status_code == 404
 
 
 def test_export_invalid_pid_returns_400(client, monkeypatch, sample_run):
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: sample_run)
     resp = client.post("/export", json={"run_id": sample_run["run_id"], "pid": 99})
     assert resp.status_code == 400
 
@@ -330,7 +330,7 @@ def test_export_invalid_pid_returns_400(client, monkeypatch, sample_run):
 
 
 def test_history_returns_runs(client, monkeypatch):
-    monkeypatch.setattr(api_module, "load_history", lambda *, limit, offset: [{"run_id": "r1"}])
+    monkeypatch.setattr(api_module, "load_history", lambda *, limit, offset, user_id=None: [{"run_id": "r1"}])
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.json()
@@ -340,14 +340,14 @@ def test_history_returns_runs(client, monkeypatch):
 
 
 def test_run_detail_happy_path(client, monkeypatch, sample_run):
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: sample_run)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: sample_run)
     resp = client.get(f"/runs/{sample_run['run_id']}")
     assert resp.status_code == 200
     assert resp.json()["run_id"] == sample_run["run_id"]
 
 
 def test_run_detail_not_found_returns_404(client, monkeypatch):
-    monkeypatch.setattr(api_module, "get_run", lambda *, run_id: None)
+    monkeypatch.setattr(api_module, "get_run", lambda *, run_id, owner_id=None: None)
     resp = client.get("/runs/does-not-exist")
     assert resp.status_code == 404
 

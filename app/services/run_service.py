@@ -141,14 +141,18 @@ def load_history(
         ]
 
 
-def get_run(*, run_id: str) -> dict | None:
+def get_run(*, run_id: str, owner_id: uuid.UUID | None = None) -> dict | None:
     """Fetch a single run by slug or UUID, including the full ideas payload.
 
-    Returns None if the run does not exist. `run_id` in the result is the slug.
+    Returns None if the run does not exist — or, when `owner_id` is given,
+    if the run belongs to a different user (callers surface both as 404 so
+    ownership isn't leaked). `run_id` in the result is the slug.
     """
     with get_session() as session:
         run = get_by_public_id(session, Run, run_id)
         if run is None:
+            return None
+        if owner_id is not None and run.user_id != owner_id:
             return None
         return {
             "run_id": public_id(run),

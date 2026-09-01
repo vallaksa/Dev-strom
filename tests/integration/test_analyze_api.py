@@ -85,7 +85,7 @@ def _patch_pipeline(monkeypatch, analysis=None, graph=None, run_id="analysis-run
         calls["repo_url"] = repo_url
         return analysis, graph
 
-    def fake_save(a, project_graph=None, repo_url=None):
+    def fake_save(a, project_graph=None, repo_url=None, user_id=None):
         calls["saved_graph"] = project_graph
         calls["saved_repo_url"] = repo_url
         return run_id
@@ -153,7 +153,7 @@ def test_analyze_pipeline_failure_returns_500(client, monkeypatch):
         raise RuntimeError("clone failed")
 
     monkeypatch.setattr(api_module, "analyze_repository_with_graph", boom)
-    monkeypatch.setattr(api_module, "save_analysis_run", lambda a, project_graph=None, repo_url=None: "x")
+    monkeypatch.setattr(api_module, "save_analysis_run", lambda a, project_graph=None, repo_url=None, user_id=None: "x")
     resp = client.post("/analyze", json={"repo_url": "https://github.com/example/repo"})
     assert resp.status_code == 500
 
@@ -187,7 +187,7 @@ def test_analyze_async_job_records_error_on_pipeline_failure(client, monkeypatch
         raise RuntimeError("clone failed")
 
     monkeypatch.setattr(api_module, "analyze_repository_with_graph", boom)
-    monkeypatch.setattr(api_module, "save_analysis_run", lambda a, project_graph=None, repo_url=None: "x")
+    monkeypatch.setattr(api_module, "save_analysis_run", lambda a, project_graph=None, repo_url=None, user_id=None: "x")
     _install_fake_jobs(monkeypatch)
 
     resp = client.post("/analyze", params={"async": "true"},
@@ -206,7 +206,7 @@ def test_get_analyze_run_reloads_same_flat_shape(client, monkeypatch):
         "analysis": _fake_analysis(), "project_graph": _fake_graph(),
         "created_at": "2026-01-01T00:00:00+00:00",
     }
-    monkeypatch.setattr(api_module, "get_analysis_run", lambda run_id: record)
+    monkeypatch.setattr(api_module, "get_analysis_run", lambda run_id, owner_id=None: record)
 
     resp = client.get("/analyze/analysis-run-1")
     assert resp.status_code == 200
@@ -219,7 +219,7 @@ def test_get_analyze_run_reloads_same_flat_shape(client, monkeypatch):
 
 
 def test_get_analyze_run_not_found_returns_404(client, monkeypatch):
-    monkeypatch.setattr(api_module, "get_analysis_run", lambda run_id: None)
+    monkeypatch.setattr(api_module, "get_analysis_run", lambda run_id, owner_id=None: None)
     assert client.get("/analyze/nope").status_code == 404
 
 
@@ -240,7 +240,7 @@ def _summary_row(n: int) -> dict:
 
 def test_list_analyses_happy_path(client, monkeypatch):
     monkeypatch.setattr(api_module, "list_analysis_runs",
-                        lambda limit, offset: [_summary_row(1), _summary_row(2)])
+                        lambda limit, offset, owner_id=None: [_summary_row(1), _summary_row(2)])
     resp = client.get("/analyses")
     assert resp.status_code == 200
     body = resp.json()
@@ -252,7 +252,7 @@ def test_list_analyses_happy_path(client, monkeypatch):
 def test_list_analyses_passes_pagination_through(client, monkeypatch):
     calls = {}
     monkeypatch.setattr(api_module, "list_analysis_runs",
-                        lambda limit, offset: calls.update(limit=limit, offset=offset) or [])
+                        lambda limit, offset, owner_id=None: calls.update(limit=limit, offset=offset) or [])
     resp = client.get("/analyses", params={"limit": 5, "offset": 10})
     assert resp.status_code == 200
     assert calls == {"limit": 5, "offset": 10}
