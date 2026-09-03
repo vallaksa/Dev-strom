@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.services import jobs as jobs_module
-from app.services.jobs import JobStatus, create_job, get_job, run_job
+from app.services.jobs import JobStatus, create_job, get_job, get_job_status, run_job
 
 
 class FakeJobRow:
@@ -31,10 +31,21 @@ class FakeJobRow:
         self.updated_at = now
 
 
+class FakeResult:
+    """Stand-in for a SQLAlchemy Result, for the one narrow read jobs.py does."""
+
+    def __init__(self, value):
+        self._value = value
+
+    def scalar_one_or_none(self):
+        return self._value
+
+
 class FakeSession:
     """Stand-in for a SQLAlchemy Session, backed by an in-memory dict keyed
     by uuid. Supports exactly the operations app.services.jobs uses:
-    session.add(row), session.flush(), session.get(Model, uuid)."""
+    session.add(row), session.flush(), session.get(Model, uuid),
+    session.execute(stmt, params)."""
 
     def __init__(self, store: dict):
         self._store = store
@@ -47,6 +58,23 @@ class FakeSession:
 
     def get(self, _model, id_: uuid.UUID):
         return self._store.get(id_)
+
+    def execute(self, _stmt, params=None):
+        """Minimal stand-in for get_job_status's raw status select.
+
+        Deliberately does not parse SQL — it answers the only statement
+        jobs.py executes. If this ever needs to inspect _stmt, the production
+        code has grown a query this fake should not be guessing at.
+        """
+        # jobs.py binds the id as a string and casts it in SQL; the store is
+        # keyed by uuid.UUID, so parse it back the way Postgres would.
+        raw_id = (params or {}).get("id")
+        try:
+            key = uuid.UUID(str(raw_id))
+        except (ValueError, TypeError, AttributeError):
+            return FakeResult(None)
+        row = self._store.get(key)
+        return FakeResult(row.status if row is not None else None)
 
 
 @pytest.fixture()
@@ -96,6 +124,25 @@ def test_get_job_malformed_id_returns_none(fake_db):
     assert get_job("not-a-uuid") is None
     assert get_job("") is None
     assert get_job("12345") is None
+
+
+def test_get_job_status_returns_status(fake_db):
+    job_id = create_job(kind="ideas", params={})
+    assert get_job_status(job_id) == JobStatus.PENDING.value
+
+    run_job(job_id, lambda: {"ok": True})
+    assert get_job_status(job_id) == JobStatus.DONE.value
+
+
+def test_get_job_status_unknown_id_returns_none(fake_db):
+    assert get_job_status(str(uuid.uuid4())) is None
+
+
+def test_get_job_status_malformed_id_returns_none(fake_db):
+    # Same contract as get_job: user-supplied path params must not raise.
+    assert get_job_status("not-a-uuid") is None
+    assert get_job_status("") is None
+    assert get_job_status("12345") is None
 
 
 def test_run_job_success_marks_done_and_stores_result(fake_db):

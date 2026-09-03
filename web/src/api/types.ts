@@ -44,6 +44,12 @@ export interface IdeasResponse {
   ideas: Idea[];
 }
 
+/** 202 body from POST /ideas?async=true (JobAcceptedResponse in dto.py). */
+export interface JobAcceptedResponse {
+  job_id: string;
+  status: string;
+}
+
 export interface ExpandRequest {
   run_id: string;
   pid: number;

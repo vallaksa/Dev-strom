@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { postIdeas } from "../api/ideas";
 import { ApiError } from "../api/client";
+import { JobStreamError } from "../api/jobs";
 import { notifyRunsChanged } from "../lib/runsStore";
 import type { Idea, IdeasRequest, IdeasResponse } from "../api/types";
 
@@ -79,7 +80,14 @@ export async function generateIdeas(
     return data;
   } catch (err) {
     if (requestId === id) {
-      const message = err instanceof ApiError ? err.message : "Something went wrong. Please try again.";
+      // JobStreamError is not an ApiError — without it, every SSE-side
+      // failure (the pipeline raising, a stream timing out) was flattened to
+      // the generic fallback and the backend's actual reason never reached
+      // the user.
+      const message =
+        err instanceof ApiError || err instanceof JobStreamError
+          ? err.message
+          : "Something went wrong. Please try again.";
       state =
         append && priorBatches.length > 0
           ? { status: "success", batches: priorBatches, appendError: message }
