@@ -60,6 +60,32 @@ class Settings(BaseSettings):
 
     # ── service URLs ───────────────────────────────────────────────────────
     api_base_url: str = Field(default="http://localhost:8000", alias="API_BASE_URL")
+    # Where the browser is served from — used for OAuth redirects back into
+    # the SPA after a successful login, and to decide whether the session
+    # cookie should be marked Secure.
+    web_base_url: str = Field(default="http://localhost:5173", alias="WEB_BASE_URL")
+
+    # ── auth (V3-4+) ───────────────────────────────────────────────────────
+    # When false, every request runs as the seeded anonymous user and no
+    # login gate is enforced — the default so local dev works without OAuth
+    # apps. Set true in any deployment that should require sign-in.
+    auth_enabled: bool = Field(default=False, alias="AUTH_ENABLED")
+    # HMAC secret for the JWT session cookie. Required when auth_enabled.
+    session_secret: str | None = Field(default=None, alias="SESSION_SECRET")
+    session_ttl_days: int = Field(default=7, alias="SESSION_TTL_DAYS")
+    # Dev-only: adds a passwordless "mock" provider (enter an email → become
+    # that user) so the sign-in flow can be exercised without OAuth apps.
+    # Never enable in production.
+    mock_auth: bool = Field(default=False, alias="MOCK_AUTH")
+
+    google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
+    github_client_id: str | None = Field(default=None, alias="GITHUB_CLIENT_ID")
+    github_client_secret: str | None = Field(default=None, alias="GITHUB_CLIENT_SECRET")
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        return self.web_base_url.startswith("https://")
 
     # ── LangSmith tracing ──────────────────────────────────────────────────
     langchain_tracing_v2: bool = Field(default=False, alias="LANGCHAIN_TRACING_V2")

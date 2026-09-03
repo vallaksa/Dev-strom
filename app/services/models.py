@@ -10,30 +10,39 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, ForeignKey, Integer, Text, text
+from sqlalchemy import Boolean, ForeignKey, Integer, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.services.db import Base
 
 # ── Anonymous user constant ────────────────────────────────────────────────────
-# Used until auth is implemented (V3-4 through V3-9).
-# Must match the UUID seeded into the `users` table.
+# The seeded fallback identity. Used for pre-auth rows and whenever
+# AUTH_ENABLED is false (local dev without OAuth apps). Real sign-ins always
+# get their own row. Must match the UUID seeded into the `users` table.
 ANONYMOUS_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
 
 # ── users ──────────────────────────────────────────────────────────────────────
 class User(Base):
-    """Identity anchor. One row per authenticated user (or anonymous)."""
+    """Identity anchor. One row per authenticated user (or the anonymous
+    fallback). Identity is `(auth_provider, provider_user_id)` — e.g.
+    `("google", "1078…")` or `("github", "42")`; the anonymous row is
+    `("system", "anonymous")`.
+    """
 
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("auth_provider", "provider_user_id", name="uq_users_provider_identity"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    google_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    auth_provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_user_id: Mapped[str] = mapped_column(Text, nullable=False)
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -174,6 +183,12 @@ class AnalysisRun(Base):
         server_default=text("gen_random_uuid()"),
     )
     slug: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=text("'00000000-0000-0000-0000-000000000000'"),
+    )
     repo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     analysis: Mapped[dict] = mapped_column(JSONB, nullable=False)
     project_graph: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

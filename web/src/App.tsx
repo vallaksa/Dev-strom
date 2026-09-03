@@ -1,10 +1,15 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { RequireAuth } from "./components/RequireAuth";
 import { LoadingState } from "./components/StateBlocks";
+import { refreshAuth } from "./lib/auth";
 
 const LandingPage = lazy(() =>
   import("./pages/LandingPage").then((m) => ({ default: m.LandingPage })),
+);
+const LoginPage = lazy(() =>
+  import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })),
 );
 const IdeasPage = lazy(() => import("./pages/IdeasPage").then((m) => ({ default: m.IdeasPage })));
 const AdvisorPage = lazy(() => import("./pages/AdvisorPage").then((m) => ({ default: m.AdvisorPage })));
@@ -50,11 +55,25 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    void refreshAuth();
+  }, []);
+
   return (
     <Suspense fallback={<LoadingState label="Loading page" />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="*" element={<AppShell><AppRoutes /></AppShell>} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="*"
+          element={
+            <RequireAuth>
+              <AppShell>
+                <AppRoutes />
+              </AppShell>
+            </RequireAuth>
+          }
+        />
       </Routes>
     </Suspense>
   );

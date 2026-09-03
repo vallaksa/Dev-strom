@@ -39,6 +39,27 @@ Set these in `.env`:
 | `API_KEY` | Yes | LLM provider key (OpenAI-compatible, e.g. OpenRouter) |
 | `TAVILY_API_KEY` | Recommended | Web-search fallback when Perplexity Sonar fails |
 | `DATABASE_URL` | Yes | PostgreSQL connection string (see [Database](#database)) |
+| `AUTH_ENABLED` | No | `false` (default) → every request is the anonymous user, no login gate. `true` → see [Auth](#auth). |
+
+## Auth
+
+Google + GitHub OAuth with a JWT session cookie. **Off by default** — local
+dev needs no OAuth apps. To turn it on, set in `.env`:
+
+```
+AUTH_ENABLED=true
+SESSION_SECRET=<python -c "import secrets;print(secrets.token_hex(32))">
+WEB_BASE_URL=http://localhost:5173
+GOOGLE_CLIENT_ID=...        # redirect URI: <API_BASE_URL>/auth/google/callback
+GOOGLE_CLIENT_SECRET=...
+GITHUB_CLIENT_ID=...        # callback URL:  <API_BASE_URL>/auth/github/callback
+GITHUB_CLIENT_SECRET=...
+```
+
+At least one provider is enough. When enabled, every data route requires a
+session; runs and analyses are scoped to the signed-in user. Endpoints:
+`GET /auth/{google,github}/login`, `/auth/{provider}/callback`,
+`GET /auth/me`, `POST /auth/logout`.
 
 ## API
 

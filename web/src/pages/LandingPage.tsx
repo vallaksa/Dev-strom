@@ -72,6 +72,9 @@ export function LandingPage() {
             </a>
           </nav>
           <div className="landing-nav__cta">
+            <Link to="/login" className="landing-nav__link landing-nav__signin">
+              Sign in
+            </Link>
             <ThemeToggle />
           </div>
         </div>

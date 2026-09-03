@@ -9,13 +9,14 @@ usage) — see those modules for the rationale.
 """
 
 import logging
+import uuid
 from abc import ABC, abstractmethod
 
 from sqlalchemy import select
 
 from app.models.domain import Analysis
 from app.services.db import get_session
-from app.services.models import AnalysisRun
+from app.services.models import ANONYMOUS_USER_ID, AnalysisRun
 from app.services.slugs import get_by_public_id, insert_with_unique_slug, public_id, slug_from_repo
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ class PostgresJsonbStore(AnalysisStore):
         *,
         project_graph: dict | None = None,
         repo_url: str | None = None,
+        user_id: uuid.UUID = ANONYMOUS_USER_ID,
     ) -> str:
         repo = repo_url or (analysis.repository.url if analysis.repository else None)
         root = analysis.repository.root_path if analysis.repository else None
@@ -69,6 +71,7 @@ class PostgresJsonbStore(AnalysisStore):
             slug_from_repo(repo, root),
             lambda _session, slug: AnalysisRun(
                 slug=slug,
+                user_id=user_id,
                 repo_url=repo_url,
                 analysis=analysis.model_dump(mode="json"),
                 project_graph=project_graph,
@@ -77,10 +80,12 @@ class PostgresJsonbStore(AnalysisStore):
         logger.info("Saved analysis run %s (repo_url=%s)", run_id, repo_url)
         return run_id
 
-    def get(self, run_id: str) -> dict | None:
+    def get(self, run_id: str, *, owner_id: uuid.UUID | None = None) -> dict | None:
         with get_session() as session:
             row = get_by_public_id(session, AnalysisRun, run_id)
             if row is None:
+                return None
+            if owner_id is not None and row.user_id != owner_id:
                 return None
             return {
                 "run_id": public_id(row),
@@ -90,18 +95,23 @@ class PostgresJsonbStore(AnalysisStore):
                 "created_at": row.created_at.isoformat(),
             }
 
-    def list_runs(self, limit: int = 20, offset: int = 0) -> list[dict]:
+    def list_runs(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        *,
+        owner_id: uuid.UUID | None = None,
+    ) -> list[dict]:
         """Convenience helper (not part of the AnalysisStore interface) for
         listing recent runs as lightweight SUMMARY rows for a History list:
         run_id, repo_url, language, status, finding/recommendation counts, and
-        created_at — derived from the stored Analysis, not the full payload."""
+        created_at — derived from the stored Analysis, not the full payload.
+        Scoped to `owner_id` when given."""
         with get_session() as session:
-            stmt = (
-                select(AnalysisRun)
-                .order_by(AnalysisRun.created_at.desc())
-                .limit(limit)
-                .offset(offset)
-            )
+            stmt = select(AnalysisRun).order_by(AnalysisRun.created_at.desc())
+            if owner_id is not None:
+                stmt = stmt.where(AnalysisRun.user_id == owner_id)
+            stmt = stmt.limit(limit).offset(offset)
             rows = session.execute(stmt).scalars().all()
             return [
                 summarize_analysis_row(public_id(r), r.repo_url, r.analysis, r.created_at.isoformat())
